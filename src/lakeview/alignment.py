@@ -22,14 +22,15 @@ from . import helpers, util
 
 # TODO: label metadata
 # Integer mode; ref skips
-# GIAB data in demo notebooks
 # Binder
-# Mapping quality filter
 # Get query sequence by position
 # Max depth marker
 
 
-def get_axes_size(ax):
+def get_ax_size(ax):
+    """
+    Return the size of a given Axes in inches.
+    """
     fig = ax.figure
     bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     width, height = bbox.width, bbox.height
@@ -86,7 +87,11 @@ class AnnotationRecord:
     strand: Optional[float] = None
     frame: Optional[int] = None
     attributes: Dict[str, str] = field(default_factory=dict)
+    id: Optional[str] = None
     parent: Optional[str] = None
+
+    def __len__(self):
+        return self.end - self.start + 1
 
 
 @dataclass(repr=False)
@@ -95,8 +100,6 @@ class GeneAnnotation(TrackPainter):
     transcripts: list[AnnotationRecord]
     exons: list[AnnotationRecord]
     cdss: list[AnnotationRecord]
-    # _transcript_key: Optional[str] = None
-    # _gene_key: Optional[str] = None
 
     @staticmethod
     def parse_attribute_string(
@@ -254,6 +257,10 @@ class GeneAnnotation(TrackPainter):
             if r.feature in gene_features:
                 genes.append(r)
             elif r.feature in transcript_features:
+                transcript_id = r.attributes.get(transcript_key)
+                if transcript_id is None:
+                    raise ValueError(f"Invalid `transcript_key` {transcript_key!r}.")
+                r.id = transcript_id
                 transcripts.append(r)
             elif r.feature in exon_features or r.feature in cds_features:
                 attr_dict = r.attributes
@@ -295,8 +302,7 @@ class GeneAnnotation(TrackPainter):
         order: Optional[Union[Callable, Iterable]] = None,
         labels: Optional[Union[Callable, Iterable]] = None,
         gene_height=None,
-        show_arrowheads=False,
-        labels_kw={}
+        labels_kw={},
     ):
         genes = self.genes
         intervals = [(g.start, g.end) for g in genes]
@@ -305,13 +311,15 @@ class GeneAnnotation(TrackPainter):
         else:
             offsets = pack_intervals(intervals)
         if colors is None:
-            colors = ['b'] * len(genes)
+            colors = ["b"] * len(genes)
         if isinstance(labels, Callable):
-            labels = [labels[g] for g in genes]
+            labels = [labels(g) for g in genes]
         self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors)
         if labels:
-            self._draw_gene_labels(ax, genes, labels, offsets, colors=colors, **labels_kw)
-        ax.set_ylim(min(offsets) - 0.5, max(offsets) + 0.5)
+            self._draw_labels(
+                ax, genes, labels, offsets, colors=colors, **labels_kw
+            )
+        ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
         ax.set_ylabel("")
 
     def _draw_gene_blocks(self, ax, genes, offsets, height, *, colors, **kw):
@@ -326,53 +334,150 @@ class GeneAnnotation(TrackPainter):
             )
         )
 
-    def _draw_gene_labels(self, ax, genes, labels, offsets, *, colors, size=8, **kw):
-        for g, l, y, c in zip(genes, labels, offsets, colors):
+    def _draw_labels(self, ax, annotations, labels, offsets, *, colors, size=8, **kw):
+        for g, l, y, c in zip(annotations, labels, offsets, colors):
             if l:
-                x = (g.start + g.end)/2
-                ax.text(x, y-0.5, l, ha='center', va='bottom', size=size)
-
-    def _draw_arrowheads(self, ax, segments, offsets, height, *, colors, **kw):
-
-        forward_xs = [seg.reference_end for seg in segments if seg.is_forward]
-        forward_ys = [y for seg, y in zip(segments, offsets) if seg.is_forward]
-        reverse_xs = [seg.reference_start for seg in segments if seg.is_reverse]
-        reverse_ys = [y for seg, y in zip(segments, offsets) if seg.is_reverse]
-        forward_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5), (0, 0.5)], readonly=True)
-        reverse_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5), (0, 0.5)], readonly=True)
-        forward_colors = [c for seg, c in zip(segments, colors) if seg.is_forward]
-        reverse_colors = [c for seg, c in zip(segments, colors) if seg.is_reverse]
-
-        for xs, ys, marker, marker_colors in zip(
-            (forward_xs, reverse_xs),
-            (forward_ys, reverse_ys),
-            (forward_marker, reverse_marker),
-            (forward_colors, reverse_colors),
-        ):
-            if len(set(forward_colors)) == 1:
-                ax.plot(
-                    xs,
-                    ys,
-                    marker=marker,
-                    markersize=height,
-                    color=marker_colors[0],
-                    markeredgecolor="none",
-                    ls="",
-                    zorder=1,
-                )
-            else:
-                ax.scatter(
-                    xs,
-                    ys,
-                    c=marker_colors,
-                    marker=marker,
-                    s=height ** 2,
-                    ec="none",
-                    zorder=1,
+                x = (g.start + g.end) / 2
+                ax.text(
+                    x, y + 0.5, l, ha="center", va="bottom", size=size, clip_on=True
                 )
 
-    def draw_transcripts(self):
-        pass
+
+    @staticmethod
+    def _pack_transcripts(transcripts: Sequence[AnnotationRecord]) -> np.array:
+        intervals = [(t.start, t.end) for t in transcripts]
+        return np.array(pack_intervals(intervals), dtype=np.float32)
+
+    @staticmethod
+    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> List[int]:
+        offsets = np.zeros(len(transcripts))
+        y = 0
+        for group in list(sorted(set(groups))):
+            group_indices = [i for i, g in enumerate(groups) if g == group]
+            group_transcripts = [transcripts[i] for i in group_indices]
+            group_offsets = GeneAnnotation._pack_transcripts(group_transcripts)
+            group_offsets[group_offsets > max_group_offset] = -np.inf
+            offsets[group_indices] = group_offsets + y
+            y = max(offsets) + 2
+        return offsets
+
+    def draw_transcripts(
+        self,
+        ax,
+        *,
+        height=None,
+        groups=None,
+        colors=None,
+        order=None,
+        labels=None,
+        max_group_depth=float('inf'),
+        transcripts_kw={},
+        exons_kw={},
+        cdss_kw={},
+        labels_kw={},
+    ):
+        transcripts = self.transcripts
+        n_transcripts = len(transcripts)
+
+        if colors is None:
+            colors = ["b"] * n_transcripts
+        if isinstance(colors, Callable):
+            colors = [colors(t) for t in transcripts]
+        if groups is None:
+            groups = [0] * n_transcripts
+        if isinstance(groups, Callable):
+            groups = [groups(t) for t in transcripts]
+        if isinstance(order, Callable):
+            order = [order(t) for t in transcripts]
+        if isinstance(labels, Callable):
+            labels = [labels(t) for t in transcripts]
+
+        if len(groups) != n_transcripts:
+            raise ValueError()
+        if len(colors) != n_transcripts:
+            raise ValueError()
+        if order is not None and len(order) != n_transcripts:
+            raise ValueError()
+        if order is not None:
+            transcripts, colors, groups = helpers.sort_by(
+                transcripts, colors, groups, by=order
+            )
+
+        offsets = self._get_transcript_offsets(
+            transcripts, groups, max_group_offset=max_group_depth - 1
+        )
+        transcripts, colors, groups, offsets = helpers.filter_by(
+            transcripts, colors, groups, offsets, by=offsets >= 0
+        )
+        if height is None:
+            _, ax_height = get_ax_size(ax)
+            height = max(
+                3, ax_height / (max(offsets) - min(offsets) + 2) * 0.5 * 72,
+            )
+        
+        
+        ax.set_xlim(
+            min(t.start for t in transcripts),
+            max(t.end for t in transcripts),
+        )
+        ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
+        ax.set_yticks([])
+
+        self._draw_transcript_backbones(ax, transcripts, offsets, colors=colors, **transcripts_kw )
+        
+        offset_dict = {t.id: y for t, y in zip(transcripts, offsets)}
+        exons = [x for x in self.exons if x.parent in offset_dict]
+        cdss = [x for x in self.cdss if x.parent in offset_dict]
+        exon_offsets = [offset_dict[x.parent] for x in exons]
+        cds_offsets = [offset_dict[x.parent] for x in cdss]
+        color_dict = {t.id: c for t, c in zip(transcripts, colors)}
+        exon_colors = [color_dict[x.parent] for x in exons]
+        cds_colors = [color_dict[x.parent] for x in cdss]
+        
+        self._draw_exons(ax, exons, exon_offsets, height=height/2, colors=exon_colors, **exons_kw)
+        self._draw_cdss(ax, cdss, cds_offsets, height=height, colors=cds_colors, **cdss_kw)
+        if labels:
+            if "size" not in labels_kw:
+                labels_kw = labels_kw.copy()
+                labels_kw['size'] = max(height/2, 5)
+            self._draw_labels(ax, transcripts, labels, offsets, colors=colors, **labels_kw)
+
+    def _draw_transcript_backbones(self, ax, transcripts, offsets, height=1, *, colors):
+        lines = [((t.start, y), (t.end, y)) for t, y in zip(transcripts, offsets)]
+        ax.add_collection(
+            LineCollection(
+                lines,
+                linewidths=height,
+                colors=colors[0] if len(set(colors)) == 1 else colors,
+                zorder=0,
+                facecolors="none",
+            )
+        )
+
+    def _draw_exons(self, ax, exons, offsets, height, *, colors, **kw):
+        lines = [((x.start, y), (x.end, y)) for x, y in zip(exons, offsets)]
+        ax.add_collection(
+            LineCollection(
+                lines,
+                linewidths=height,
+                colors=colors[0] if len(set(colors)) == 1 else colors,
+                zorder=0,
+                facecolors="none",
+            )
+        )
+
+    
+    def _draw_cdss(self, ax, cdss, offsets, height, *, colors, **kw):
+        lines = [((x.start, y), (x.end, y)) for x, y in zip(cdss, offsets)]
+        ax.add_collection(
+            LineCollection(
+                lines,
+                linewidths=height,
+                colors=colors[0] if len(set(colors)) == 1 else colors,
+                zorder=0,
+                facecolors="none",
+            )
+        )
 
 
 class CoverageDepth(TrackPainter):
@@ -916,7 +1021,7 @@ class SequenceAlignment(TrackPainter):
         group_labels: Optional[Union[Callable, Iterable]] = None,
         colors: Optional[Union[Callable, Iterable]] = None,
         order: Optional[Union[Callable, Iterable]] = None,
-        segment_height=None,
+        height=None,
         show_backbones=True,
         show_arrowheads=True,
         show_insertions=True,
@@ -931,7 +1036,7 @@ class SequenceAlignment(TrackPainter):
         min_hard_clipping_size=10,
         show_letters=False,
         show_group_separators=True,
-        max_group_depth=1000,
+        max_depth=1000,
         backbones_kw={},
         arrowheads_kw={},
         insertions_kw={},
@@ -955,7 +1060,7 @@ class SequenceAlignment(TrackPainter):
         if groups is None:
             groups = [0] * n_segments
         if isinstance(groups, Callable):
-            groups = [groups[seg] for seg in segments]
+            groups = [groups(seg) for seg in segments]
         if isinstance(order, Callable):
             order = [order(seg) for seg in segments]
 
@@ -972,16 +1077,16 @@ class SequenceAlignment(TrackPainter):
             )
 
         offsets = self._get_segment_offsets(
-            segments, groups, max_group_offset=max_group_depth
+            segments, groups, max_group_offset=max_depth - 1
         )
         segments, colors, groups, offsets = helpers.filter_by(
             segments, colors, groups, offsets, by=offsets >= 0
         )
 
-        if segment_height is None:
-            _, ax_height = get_axes_size(ax)
-            segment_height = max(
-                2, ax_height / (max(offsets) - min(offsets) + 2) * 0.96 * 72,
+        if height is None:
+            _, ax_height = get_ax_size(ax)
+            height = max(
+                2, ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,
             )
 
         ax.set_xlim(
@@ -996,7 +1101,7 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                height=segment_height,
+                height=height,
                 colors=colors,
                 **backbones_kw,
             )
@@ -1005,20 +1110,20 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                height=segment_height,
+                height=height,
                 colors=colors,
                 **arrowheads_kw,
             )
         if show_mismatches:
             self._draw_alignment_mismatches(
-                ax, segments, offsets, height=segment_height, **mismatches_kw
+                ax, segments, offsets, height=height, **mismatches_kw
             )
         if show_insertions:
             self._draw_insertions(
                 ax,
                 segments,
                 offsets,
-                height=segment_height,
+                height=height,
                 min_insertion_size=min_insertion_size,
                 **insertions_kw,
             )
@@ -1027,7 +1132,7 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                height=segment_height,
+                height=height,
                 min_deletion_size=min_deletion_size,
                 **deletions_kw,
             )
@@ -1036,7 +1141,7 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                height=segment_height,
+                height=height,
                 min_soft_clipping_size=min_soft_clipping_size,
                 **soft_clipping_kw,
             )
@@ -1045,13 +1150,13 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                height=segment_height,
+                height=height,
                 min_hard_clipping_size=min_hard_clipping_size,
                 **hard_clipping_kw,
             )
         if show_modified_bases:
             self._draw_modified_bases(
-                ax, segments, offsets, height=segment_height, **modified_bases_kw
+                ax, segments, offsets, height=height, **modified_bases_kw
             )
         if show_group_separators:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
