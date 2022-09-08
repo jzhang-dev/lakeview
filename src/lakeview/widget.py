@@ -13,7 +13,8 @@ import ipywidgets
 
 # TODO: more buttons; auto x tick labels; prevent fig resizing
 # TODO: fix first display problem; smart scrolling / resizing; show certain artists only when zooming in;
-
+# TODO: Fix interactivity; JS error
+# TODO: soft clips should display as lines when not showing arrows
 
 
 class GenomeViewer:
@@ -29,13 +30,13 @@ class GenomeViewer:
             figsize=figsize,
             sharex=True,
             sharey=False,
-            squeeze=True,
+            squeeze=False,
             gridspec_kw=dict(height_ratios=height_ratios),
             constrained_layout=True
         )
         self.figure = fig
         #self.blit_manager = _BlitManager(fig.canvas)
-        self.axes = axes
+        self.axes = list(axes[:, 0])
         self._init_app()
 
     def _init_app(self):

@@ -71,7 +71,7 @@ def draw_rigid_polygon(
         or not isinstance(position[0], Real)
         or not isinstance(position[1], Real)
     ):
-        raise ValueError(f"{position=}")
+        raise ValueError(f"position={position}")
     transform = ax.figure.dpi_scale_trans + mpl.transforms.ScaledTranslation(
         *position, position_transform
     )

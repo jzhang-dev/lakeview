@@ -6,14 +6,11 @@ import collections
 from multiprocessing.sharedctypes import Value
 
 from typing import Callable, Iterable, Optional, List, Tuple, Dict, Sequence, Union
-from numbers import Number, Real
+from numbers import Real
 from dataclasses import dataclass, field
 import warnings
 import functools, itertools
-from attr import attributes
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.collections import LineCollection
 import pysam
@@ -25,7 +22,7 @@ from . import helpers, util
 # Binder
 # Get query sequence by position
 # Max depth marker
-
+# TODO: aln end postions are exclusive in pysam
 
 def get_ax_size(ax):
     """
@@ -231,7 +228,7 @@ class GeneAnnotation(TrackPainter):
         preset = None if preset is None else preset.lower()
         if transcript_key is not None and preset is not None:
             warnings.warn(
-                f"Overriding `preset` {preset!r} with user-supplied `{transcript_key=}`. To prevent this warning, set `preset = None`."
+                f"Overriding `preset` {preset!r} with user-supplied `transcript_key={transcript_key}`. To prevent this warning, set `preset = None`."
             )
         features = gene_features + transcript_features + exon_features + cds_features
         parse_kw = dict(
@@ -316,9 +313,7 @@ class GeneAnnotation(TrackPainter):
             labels = [labels(g) for g in genes]
         self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors)
         if labels:
-            self._draw_labels(
-                ax, genes, labels, offsets, colors=colors, **labels_kw
-            )
+            self._draw_labels(ax, genes, labels, offsets, colors=colors, **labels_kw)
         ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
         ax.set_ylabel("")
 
@@ -341,7 +336,6 @@ class GeneAnnotation(TrackPainter):
                 ax.text(
                     x, y + 0.5, l, ha="center", va="bottom", size=size, clip_on=True
                 )
-
 
     @staticmethod
     def _pack_transcripts(transcripts: Sequence[AnnotationRecord]) -> np.array:
@@ -370,7 +364,7 @@ class GeneAnnotation(TrackPainter):
         colors=None,
         order=None,
         labels=None,
-        max_group_depth=float('inf'),
+        max_group_depth=float("inf"),
         transcripts_kw={},
         exons_kw={},
         cdss_kw={},
@@ -411,20 +405,18 @@ class GeneAnnotation(TrackPainter):
         )
         if height is None:
             _, ax_height = get_ax_size(ax)
-            height = max(
-                3, ax_height / (max(offsets) - min(offsets) + 2) * 0.5 * 72,
-            )
-        
-        
+            height = max(3, ax_height / (max(offsets) - min(offsets) + 2) * 0.5 * 72,)
+
         ax.set_xlim(
-            min(t.start for t in transcripts),
-            max(t.end for t in transcripts),
+            min(t.start for t in transcripts), max(t.end for t in transcripts),
         )
         ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
         ax.set_yticks([])
 
-        self._draw_transcript_backbones(ax, transcripts, offsets, colors=colors, **transcripts_kw )
-        
+        self._draw_transcript_backbones(
+            ax, transcripts, offsets, colors=colors, **transcripts_kw
+        )
+
         offset_dict = {t.id: y for t, y in zip(transcripts, offsets)}
         exons = [x for x in self.exons if x.parent in offset_dict]
         cdss = [x for x in self.cdss if x.parent in offset_dict]
@@ -433,14 +425,20 @@ class GeneAnnotation(TrackPainter):
         color_dict = {t.id: c for t, c in zip(transcripts, colors)}
         exon_colors = [color_dict[x.parent] for x in exons]
         cds_colors = [color_dict[x.parent] for x in cdss]
-        
-        self._draw_exons(ax, exons, exon_offsets, height=height/2, colors=exon_colors, **exons_kw)
-        self._draw_cdss(ax, cdss, cds_offsets, height=height, colors=cds_colors, **cdss_kw)
+
+        self._draw_exons(
+            ax, exons, exon_offsets, height=height / 2, colors=exon_colors, **exons_kw
+        )
+        self._draw_cdss(
+            ax, cdss, cds_offsets, height=height, colors=cds_colors, **cdss_kw
+        )
         if labels:
             if "size" not in labels_kw:
                 labels_kw = labels_kw.copy()
-                labels_kw['size'] = max(height/2, 5)
-            self._draw_labels(ax, transcripts, labels, offsets, colors=colors, **labels_kw)
+                labels_kw["size"] = max(height / 2, 5)
+            self._draw_labels(
+                ax, transcripts, labels, offsets, colors=colors, **labels_kw
+            )
 
     def _draw_transcript_backbones(self, ax, transcripts, offsets, height=1, *, colors):
         lines = [((t.start, y), (t.end, y)) for t, y in zip(transcripts, offsets)]
@@ -466,7 +464,6 @@ class GeneAnnotation(TrackPainter):
             )
         )
 
-    
     def _draw_cdss(self, ax, cdss, offsets, height, *, colors, **kw):
         lines = [((x.start, y), (x.end, y)) for x, y in zip(cdss, offsets)]
         ax.add_collection(
@@ -586,7 +583,7 @@ class AlignedSegment:
                 qry_offset += length
             if operation == 9:
                 # TODO: check Operation 9 (BAM_CBACK)
-                raise ValueError(f"{operation=}")
+                raise ValueError(f"operation={operation}")
             if found_op_match:
                 # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
                 mismatched_bases = None
@@ -615,7 +612,8 @@ class AlignedSegment:
     @functools.cached_property
     def mismatched_bases(self):
         query_sequence = self.query_sequence
-        if (mismatched_bases := self._cigar_differences[2]) is not None:
+        mismatched_bases = self._cigar_differences[2]
+        if mismatched_bases  is not None:
             reference_start = self.reference_start
             for m in mismatched_bases:
                 m.reference_position = reference_start + m.reference_offset
@@ -638,11 +636,10 @@ class AlignedSegment:
                             query_base=qry_base,
                         )
                     )
-        elif self.alignment and (
-            reference_sequence := self.alignment.reference_sequence
-        ):
+        elif self.alignment and self.alignment.reference_sequence:
             # MD tag not present.
             # Fall back to checking user-supplied reference sequence.
+            reference_sequence = self.alignment.reference_sequence
             for qry_pos, ref_pos in self.get_aligned_pairs(
                 matches_only=True, with_seq=False
             ):
@@ -758,7 +755,7 @@ class CIGAR:
                 qry_offset += length
             if operation == 9:
                 # TODO: check Operation 9 (BAM_CBACK)
-                raise ValueError(f"{operation=}")
+                raise ValueError(f"operation={operation}")
             if found_op_match:
                 # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
                 mismatched_bases = None
@@ -830,7 +827,8 @@ class AlignedSegment:
     @functools.cached_property
     def mismatched_bases(self):
         query_sequence = self.query_sequence
-        if (mismatched_bases := self.cigar.mismatched_bases) is not None:
+        mismatched_bases = self.cigar.mismatched_bases
+        if mismatched_bases is not None:
             # Use CIGAR mismatches if available
             for m in mismatched_bases:
                 m.query_position = m.query_offset
@@ -852,11 +850,10 @@ class AlignedSegment:
                             query_base=qry_base,
                         )
                     )
-        elif self.alignment and (
-            reference_sequence := self.alignment.reference_sequence
-        ):
+        elif self.alignment and self.alignment.reference_sequence:
             # MD tag not present.
             # Fall back to checking user-supplied reference sequence.
+            reference_sequence = self.alignment.reference_sequence
             for qry_pos, ref_pos in self.get_aligned_pairs(
                 matches_only=True, with_seq=False
             ):
@@ -952,13 +949,13 @@ class SequenceAlignment(TrackPainter):
                         )
                     )
                 else:
-                    segment_list = list(alignment_file)
+                    segment_list = list(alignment_file) # TODO: use .fetch to avoid exhausting the iterator; no need to open again for pileup
                 if not segment_list:
                     warnings.warn(f"No aligned segments loaded.")
         else:
             segment_list = None
 
-        if load_pileup:
+        if load_pileup: 
             with pysam.AlignmentFile(filepath, mode) as alignment_file:
                 if any((reference_name, start, end, region)):
                     pileup_params = dict(
@@ -1085,9 +1082,8 @@ class SequenceAlignment(TrackPainter):
 
         if height is None:
             _, ax_height = get_ax_size(ax)
-            height = max(
-                2, ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,
-            )
+            height = max(2, ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,)
+            height = min(height, 10)
 
         ax.set_xlim(
             min(segment.reference_start for segment in segments),
@@ -1098,21 +1094,11 @@ class SequenceAlignment(TrackPainter):
 
         if show_backbones:
             self._draw_backbones(
-                ax,
-                segments,
-                offsets,
-                height=height,
-                colors=colors,
-                **backbones_kw,
+                ax, segments, offsets, height=height, colors=colors, **backbones_kw,
             )
         if show_arrowheads:
             self._draw_arrowheads(
-                ax,
-                segments,
-                offsets,
-                height=height,
-                colors=colors,
-                **arrowheads_kw,
+                ax, segments, offsets, height=height, colors=colors, **arrowheads_kw,
             )
         if show_mismatches:
             self._draw_alignment_mismatches(
@@ -1143,6 +1129,7 @@ class SequenceAlignment(TrackPainter):
                 offsets,
                 height=height,
                 min_soft_clipping_size=min_soft_clipping_size,
+                show_arrowheads=show_arrowheads,
                 **soft_clipping_kw,
             )
         if show_hard_clipping:
@@ -1152,6 +1139,7 @@ class SequenceAlignment(TrackPainter):
                 offsets,
                 height=height,
                 min_hard_clipping_size=min_hard_clipping_size,
+                show_arrowheads=show_arrowheads,
                 **hard_clipping_kw,
             )
         if show_modified_bases:
@@ -1193,6 +1181,8 @@ class SequenceAlignment(TrackPainter):
             (forward_marker, reverse_marker),
             (forward_colors, reverse_colors),
         ):
+            if not xs:
+                continue
             if len(set(forward_colors)) == 1:
                 ax.plot(
                     xs,
@@ -1411,6 +1401,7 @@ class SequenceAlignment(TrackPainter):
         height,
         *,
         min_soft_clipping_size,
+        show_arrowheads=True,
         linewidth=1.5,
         color="deeppink",
     ):
@@ -1453,7 +1444,7 @@ class SequenceAlignment(TrackPainter):
             ax.plot(
                 xs,
                 ys,
-                marker=marker,
+                marker=marker if show_arrowheads else tail_marker,
                 markersize=height,
                 markeredgecolor=color,
                 markerfacecolor="none",
@@ -1469,6 +1460,7 @@ class SequenceAlignment(TrackPainter):
         height,
         *,
         min_hard_clipping_size,
+        show_arrowheads=True,
         linewidth=1.5,
         color="deeppink",
     ):
@@ -1511,27 +1503,13 @@ class SequenceAlignment(TrackPainter):
             ax.plot(
                 xs,
                 ys,
-                marker=marker,
+                marker=marker if show_arrowheads else tail_marker,
                 markersize=height,
                 markeredgecolor=color,
                 markerfacecolor="none",
                 markeredgewidth=linewidth,
                 ls="",
             )
-
-    @functools.cached_property
-    def _reference_bases(self) -> Dict[int, str]:
-        reference_base_dict = collections.defaultdict(lambda: None)
-        for seg in self.segments:
-            for mb in seg.mismatched_bases:
-                if (
-                    mb.reference_base is not None
-                    and mb.reference_position not in reference_base_dict
-                ):
-                    reference_base_dict[
-                        mb.reference_position
-                    ] = mb.reference_base.upper()
-        return reference_base_dict
 
     def draw_pileup(
         self,
