@@ -1025,7 +1025,7 @@ class SequenceAlignment(TrackPainter):
         min_insertion_size=10,
         show_deletions=True,
         min_deletion_size=10,
-        show_mismatches=True,
+        show_mismatches=True, # TODO: show_mismatches=None -> draw if available
         show_modified_bases=False,
         show_soft_clipping=True,
         min_soft_clipping_size=10,
@@ -1516,7 +1516,7 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         color="lightgray",
-        show_mismatches=True,
+        show_mismatches=True, # TODO: show_mismatches=None -> draw if available
         min_alt_frequency=0.2,
         min_alt_depth=2,
         mismatch_kw={},
@@ -1602,7 +1602,7 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         color="lightgray",
-        show_mismatches=True,
+        show_mismatches=True, # TODO: show_mismatches=None -> draw if available
         min_alt_frequency=0.2,
         min_alt_depth=2,
         mismatch_kw={},
