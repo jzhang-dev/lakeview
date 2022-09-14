@@ -17,7 +17,7 @@ tasks:
     command: jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
 
   - name: run_http_server
-    command: python -m http.server 8000
+    command: cd docs && python -m http.server 8000
 
 ports:
   - name: JupyterLab
