@@ -2,5 +2,7 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - init: pip install -ve .
+  - init: |
+      pip install -ve .
+      jupyter nbconvert --to html --execute docs/examples/HG002_IGH/HG002_IGH.py.ipynb --output=HG002_IGH.py.ipynb.html
     command: jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
