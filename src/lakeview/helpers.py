@@ -1,6 +1,31 @@
 from typing import Tuple, Iterable
 from numbers import Real
 import matplotlib as mpl
+from matplotlib.colors import rgb2hex
+from matplotlib import cm
+
+
+def get_cmap_colors(cmap_name, format_="hex"):
+    """
+    >>> get_cmap_colors("Set2")
+    ['#66c2a5',
+     '#fc8d62',
+     '#8da0cb',
+     '#e78ac3',
+     '#a6d854',
+     '#ffd92f',
+     '#e5c494',
+     '#b3b3b3']
+    """
+    cmap = cm.get_cmap(cmap_name, 256)
+    colors = list({cmap(i)[:3]: None for i in range(cmap.N)})
+    if format_ == "rgb":
+        pass
+    elif format_ == "hex":
+        colors = [rgb2hex(c) for c in colors]
+    else:
+        raise ValueError("`format_` must be one of {'rgb', 'hex'}")
+    return colors
 
 
 def sort_by(*iterables, by, reverse=False):
@@ -54,8 +79,6 @@ def filter_by(*iterables, by):
 #     return bound_method
 
 
-
-
 def draw_rigid_polygon(
     ax,
     shape: Iterable[Tuple[Real, Real]],
@@ -71,7 +94,7 @@ def draw_rigid_polygon(
         or not isinstance(position[0], Real)
         or not isinstance(position[1], Real)
     ):
-        raise ValueError(f"{position=}")
+        raise ValueError(f"position={position}")
     transform = ax.figure.dpi_scale_trans + mpl.transforms.ScaledTranslation(
         *position, position_transform
     )

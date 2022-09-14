@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lakeview"
+description = "A Python library for creating publication-quality genome visualisations."
+readme = "README.md"
+version = "0.1.0"
+requires-python = ">=3.7"
+keywords = ["bioinformatics", "visualisation"]
+license = {text = "GNU GENERAL PUBLIC LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "ipympl",
+    "IPython",
+    "ipywidgets",
+    "matplotlib",
+    "pysam",
+]
