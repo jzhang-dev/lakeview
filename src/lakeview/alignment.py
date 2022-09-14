@@ -9,7 +9,8 @@ from typing import Callable, Iterable, Optional, List, Tuple, Dict, Sequence, Un
 from numbers import Real
 from dataclasses import dataclass, field
 import warnings
-import functools, itertools
+import functools
+import itertools
 import numpy as np
 from matplotlib.path import Path
 from matplotlib.collections import LineCollection
@@ -24,6 +25,7 @@ from . import helpers, util
 # Max depth marker
 # TODO: aln end postions are exclusive in pysam
 
+
 def get_ax_size(ax):
     """
     Return the size of a given Axes in inches.
@@ -37,7 +39,7 @@ def get_ax_size(ax):
 def pack_intervals(intervals: Iterable[Tuple[Real, Real]]) -> List[Real]:
     """
     Assign an non-negative offset to each input interval so that intervals sharing the same offset will overlap with each other, while minimising offset values.
-    Intervals are treated as being closed. 
+    Intervals are treated as being closed.
 
     >>> pack_intervals([(1, 2), (3, 4), (1, 3)])
     [0, 0, 1]
@@ -127,7 +129,7 @@ class GeneAnnotation(TrackPainter):
 
     @staticmethod
     def parse_file(
-        file_handle,
+        file_object,
         format,
         *,
         features=None,
@@ -162,7 +164,7 @@ class GeneAnnotation(TrackPainter):
             raise ValueError("Only GTF and GFF3 formats are supported.")
 
         records = []
-        for line in file_handle:
+        for line in file_object:
             if line.startswith("#"):
                 continue
             data = line.strip("\n").split("\t")
@@ -210,7 +212,7 @@ class GeneAnnotation(TrackPainter):
     def from_file(
         cls,
         file_path=None,
-        file_handle=None,
+        file_object=None,
         *,
         format,
         preset="auto",
@@ -239,13 +241,13 @@ class GeneAnnotation(TrackPainter):
             end=end,
             assume_sorted=assume_sorted,
         )
-        if file_path is not None and file_handle is None:
+        if file_path is not None and file_object is None:
             with open(file_path, "r") as f:
                 records = cls.parse_file(f, **parse_kw)
-        elif file_handle is not None and file_path is None:
-            records = cls.parse_file(file_handle, **parse_kw)
+        elif file_object is not None and file_path is None:
+            records = cls.parse_file(file_object, **parse_kw)
         else:
-            raise ValueError("Either `file_path` or `file_handle` must be provided.")
+            raise ValueError("Either `file_path` or `file_object` must be provided.")
         if not records:
             warnings.warn("No annotation records have been loaded.")
 
@@ -405,10 +407,14 @@ class GeneAnnotation(TrackPainter):
         )
         if height is None:
             _, ax_height = get_ax_size(ax)
-            height = max(3, ax_height / (max(offsets) - min(offsets) + 2) * 0.5 * 72,)
+            height = max(
+                3,
+                ax_height / (max(offsets) - min(offsets) + 2) * 0.5 * 72,
+            )
 
         ax.set_xlim(
-            min(t.start for t in transcripts), max(t.end for t in transcripts),
+            min(t.start for t in transcripts),
+            max(t.end for t in transcripts),
         )
         ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
         ax.set_yticks([])
@@ -613,7 +619,7 @@ class AlignedSegment:
     def mismatched_bases(self):
         query_sequence = self.query_sequence
         mismatched_bases = self._cigar_differences[2]
-        if mismatched_bases  is not None:
+        if mismatched_bases is not None:
             reference_start = self.reference_start
             for m in mismatched_bases:
                 m.reference_position = reference_start + m.reference_offset
@@ -665,7 +671,11 @@ class AlignedSegment:
     def modified_bases(self) -> List[ModifiedBase]:
         modified_bases = []
         for (
-            (canonical_base, strand, modification,),
+            (
+                canonical_base,
+                strand,
+                modification,
+            ),
             data,
         ) in self.wrapped.modified_bases.items():
             strand = {0: "+", 1: "-"}[strand]
@@ -879,7 +889,11 @@ class AlignedSegment:
     def modified_bases(self) -> List[ModifiedBase]:
         modified_bases = []
         for (
-            (canonical_base, strand, modification,),
+            (
+                canonical_base,
+                strand,
+                modification,
+            ),
             data,
         ) in self.wrapped.modified_bases.items():
             strand = {0: "+", 1: "-"}[strand]
@@ -918,7 +932,7 @@ class SequenceAlignment(TrackPainter):
     @classmethod
     def from_file(
         cls,
-        filepath,
+        file_path,
         mode=None,
         reference_name=None,
         start=None,
@@ -928,69 +942,65 @@ class SequenceAlignment(TrackPainter):
         reference_sequence=None,
         load_alignment=True,
         load_pileup=True,
+        check_sq=True,
+        **alignment_file_kw,
     ):
         if not load_alignment and not load_pileup:
             raise ValueError("`load_alignment` and `load_pileup` cannot both be False.")
-        if load_alignment:
-            with pysam.AlignmentFile(filepath, mode) as alignment_file:
-                reference_name_tuple = alignment_file.references
-                if start is not None or end is not None:
-                    if reference_name is None:
-                        if len(reference_name_tuple) == 1:
-                            reference_name = reference_name_tuple[0]
-                        else:
-                            raise ValueError(
-                                f"Reference name is not provided. Valid values: {reference_name_tuple}"
-                            )
-                if any((reference_name, start, end, region)):
-                    segment_list = list(
-                        alignment_file.fetch(
-                            contig=reference_name, start=start, stop=end, region=region
+        with pysam.AlignmentFile(
+            file_path, mode, check_sq=check_sq, **alignment_file_kw
+        ) as alignment_file:
+            # Check reference_name
+            reference_name_tuple = alignment_file.references
+            if start is not None or end is not None:
+                if reference_name is None:
+                    if len(reference_name_tuple) == 1:
+                        reference_name = reference_name_tuple[0]
+                    else:
+                        raise ValueError(
+                            f"Reference name is not provided. Valid values: {reference_name_tuple}"
                         )
-                    )
-                else:
-                    segment_list = list(alignment_file) # TODO: use .fetch to avoid exhausting the iterator; no need to open again for pileup
+            if any((reference_name, start, end, region)):
+                region_kw = dict(
+                    contig=reference_name, start=start, stop=end, region=region
+                )
+            else:
+                region_kw = {}
+            # Load segments
+            if load_alignment:
+                segment_list = list(alignment_file.fetch(**region_kw))
                 if not segment_list:
                     warnings.warn(f"No aligned segments loaded.")
-        else:
-            segment_list = None
-
-        if load_pileup: 
-            with pysam.AlignmentFile(filepath, mode) as alignment_file:
-                if any((reference_name, start, end, region)):
-                    pileup_params = dict(
-                        contig=reference_name, start=start, stop=end, region=region
-                    )
-                else:
-                    pileup_params = {}
-
+            else:
+                segment_list = None
+            # Load pileup
+            if load_pileup:
                 pileup_depths = {}
                 pileup_bases = {}
-                for col in alignment_file.pileup(**pileup_params):
+                for col in alignment_file.pileup(**region_kw):
                     position = col.reference_pos
                     query_bases = [b.upper() for b in col.get_query_sequences() if b]
                     base_counter = collections.Counter(query_bases)
                     if len(base_counter) > 1:
                         pileup_bases[position] = base_counter
                     pileup_depths[position] = col.nsegments
+                # If a position has no coverage, there will be no columns corresponding to that position.
+                # Need to manually add zeros to the pileup_depths for correct plotting
+                sorted_pileup_depths = {}
+                for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
+                    sorted_pileup_depths[position] = pileup_depths.get(position, 0)
+                pileup_depths = sorted_pileup_depths
+            else:
+                pileup_depths = None
+                pileup_bases = None
 
-            # If a position has no coverage, there will be no columns corresponding to that position.
-            # Need to manually add zeros to the pileup_depths for correct plotting
-            sorted_pileup_depths = {}
-            for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
-                sorted_pileup_depths[position] = pileup_depths.get(position, 0)
-            pileup_depths = sorted_pileup_depths
-        else:
-            pileup_depths = None
-            pileup_bases = None
-
-        return cls(
-            segments=[AlignedSegment(seg) for seg in segment_list],
-            pileup_depths=pileup_depths,
-            pileup_bases=pileup_bases,
-            reference_name=reference_name,
-            reference_sequence=reference_sequence,
-        )
+            return cls(
+                segments=[AlignedSegment(seg) for seg in segment_list],
+                pileup_depths=pileup_depths,
+                pileup_bases=pileup_bases,
+                reference_name=reference_name,
+                reference_sequence=reference_sequence,
+            )
 
     @staticmethod
     def _pack_segments(segments: Sequence[AlignedSegment]) -> np.array:
@@ -1025,7 +1035,7 @@ class SequenceAlignment(TrackPainter):
         min_insertion_size=10,
         show_deletions=True,
         min_deletion_size=10,
-        show_mismatches=True, # TODO: show_mismatches=None -> draw if available
+        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
         show_modified_bases=False,
         show_soft_clipping=True,
         min_soft_clipping_size=10,
@@ -1082,7 +1092,10 @@ class SequenceAlignment(TrackPainter):
 
         if height is None:
             _, ax_height = get_ax_size(ax)
-            height = max(2, ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,)
+            height = max(
+                2,
+                ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,
+            )
             height = min(height, 10)
 
         ax.set_xlim(
@@ -1094,11 +1107,21 @@ class SequenceAlignment(TrackPainter):
 
         if show_backbones:
             self._draw_backbones(
-                ax, segments, offsets, height=height, colors=colors, **backbones_kw,
+                ax,
+                segments,
+                offsets,
+                height=height,
+                colors=colors,
+                **backbones_kw,
             )
         if show_arrowheads:
             self._draw_arrowheads(
-                ax, segments, offsets, height=height, colors=colors, **arrowheads_kw,
+                ax,
+                segments,
+                offsets,
+                height=height,
+                colors=colors,
+                **arrowheads_kw,
             )
         if show_mismatches:
             self._draw_alignment_mismatches(
@@ -1200,7 +1223,7 @@ class SequenceAlignment(TrackPainter):
                     ys,
                     c=marker_colors,
                     marker=marker,
-                    s=height ** 2,
+                    s=height**2,
                     ec="none",
                     zorder=1,
                 )
@@ -1320,7 +1343,11 @@ class SequenceAlignment(TrackPainter):
 
         ax.add_collection(
             LineCollection(
-                lines, linewidths=height, colors=color, zorder=1, facecolors="none",
+                lines,
+                linewidths=height,
+                colors=color,
+                zorder=1,
+                facecolors="none",
             )
         )
         ax.plot(
@@ -1337,7 +1364,11 @@ class SequenceAlignment(TrackPainter):
         )
         ax.add_collection(
             LineCollection(
-                lines, linewidths=1, colors="k", zorder=1.2, facecolors="none",
+                lines,
+                linewidths=1,
+                colors="k",
+                zorder=1.2,
+                facecolors="none",
             )
         )
 
@@ -1373,7 +1404,7 @@ class SequenceAlignment(TrackPainter):
                 ax.scatter(
                     xs,
                     ys,
-                    s=height ** 2,
+                    s=height**2,
                     c=cs,
                     cmap=cmap,
                     vmin=0,
@@ -1516,7 +1547,7 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         color="lightgray",
-        show_mismatches=True, # TODO: show_mismatches=None -> draw if available
+        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
         min_alt_frequency=0.2,
         min_alt_depth=2,
         mismatch_kw={},
@@ -1541,7 +1572,12 @@ class SequenceAlignment(TrackPainter):
         min_alt_frequency,
         min_alt_depth,
         linewidth=1.5,
-        palette={"A": "tab:green", "T": "tab:red", "C": "tab:blue", "G": "tab:brown",},
+        palette={
+            "A": "tab:green",
+            "T": "tab:red",
+            "C": "tab:blue",
+            "G": "tab:brown",
+        },
     ):
 
         mismatch_positions = set()
@@ -1602,7 +1638,7 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         color="lightgray",
-        show_mismatches=True, # TODO: show_mismatches=None -> draw if available
+        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
         min_alt_frequency=0.2,
         min_alt_depth=2,
         mismatch_kw={},
@@ -1629,7 +1665,12 @@ class SequenceAlignment(TrackPainter):
         min_alt_frequency,
         min_alt_depth,
         linewidth=1.5,
-        palette={"A": "tab:green", "T": "tab:red", "C": "tab:blue", "G": "tab:brown",},
+        palette={
+            "A": "tab:green",
+            "T": "tab:red",
+            "C": "tab:blue",
+            "G": "tab:brown",
+        },
     ):
 
         mismatch_positions = set()
