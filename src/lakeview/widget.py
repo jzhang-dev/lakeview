@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 import ipywidgets
 
-
+# TODO: give up interactivity?
 # TODO: more buttons; auto x tick labels; prevent fig resizing
 # TODO: fix first display problem; smart scrolling / resizing; show certain artists only when zooming in;
 # TODO: Fix interactivity; JS error
