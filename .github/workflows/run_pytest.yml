@@ -1,6 +1,6 @@
 
 
-name: Run pytest
+name: pytest
 
 on: [push]
 
