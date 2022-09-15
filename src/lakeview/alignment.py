@@ -1546,7 +1546,8 @@ class SequenceAlignment(TrackPainter):
         self,
         ax,
         *,
-        color="lightgray",
+        facecolor="lightgray",
+        edgecolor='none',
         show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
         min_alt_frequency=0.2,
         min_alt_depth=2,
@@ -1555,7 +1556,7 @@ class SequenceAlignment(TrackPainter):
     ):
         x = list(self.pileup_depths)
         y = list(self.pileup_depths.values())
-        ax.fill_between(x, y1=y, y2=0, step="mid", facecolor=color, edgecolor="none")
+        ax.fill_between(x, y1=y, y2=0, step="mid", facecolor=facecolor, edgecolor=edgecolor, **kw)
         ax.set_ylim(bottom=0)
         if show_mismatches:
             self._draw_pileup_mismatches(
