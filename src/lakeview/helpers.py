@@ -7,6 +7,8 @@ from matplotlib import cm
 
 def get_cmap_colors(cmap_name, format_="hex"):
     """
+    https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
+    
     >>> get_cmap_colors("Set2")
     ['#66c2a5',
      '#fc8d62',
