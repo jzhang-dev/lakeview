@@ -1,14 +1,17 @@
 from typing import Tuple, Iterable
+import os
+import tempfile
 from numbers import Real
 import matplotlib as mpl
 from matplotlib.colors import rgb2hex
 from matplotlib import cm
+import pysam
 
 
 def get_cmap_colors(cmap_name, format_="hex"):
     """
     https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
-    
+
     >>> get_cmap_colors("Set2")
     ['#66c2a5',
      '#fc8d62',
@@ -100,5 +103,37 @@ def draw_rigid_polygon(
     transform = ax.figure.dpi_scale_trans + mpl.transforms.ScaledTranslation(
         *position, position_transform
     )
-    polygon = mpl.patches.Polygon(shape, transform=transform, **kw,)
+    polygon = mpl.patches.Polygon(
+        shape,
+        transform=transform,
+        **kw,
+    )
     ax.add_patch(polygon)
+
+
+def download_bam(
+    bam_url,
+    bai_url,
+    region,
+    output_bam_path,
+    output_bai_path=None,
+    *,
+    index=True,
+    override=False,
+):
+    if not os.path.isfile(output_bam_path) or override:
+        workdir = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            try:
+                os.chdir(d)
+                bam_data = pysam.view("-X", "-b", bam_url, bai_url, region)
+            finally:
+                os.chdir(workdir)
+        os.makedirs(os.path.split(output_bam_path)[0], exist_ok=True)
+        with open(output_bam_path, "wb") as f:
+            f.write(bam_data)
+    if output_bai_path is None:
+        output_bai_path = output_bam_path + ".bai"
+    if index and (not os.path.isfile(output_bai_path) or override):
+        os.makedirs(os.path.split(output_bai_path)[0], exist_ok=True)
+        pysam.index(output_bam_path, output_bai_path)
