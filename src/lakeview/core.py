@@ -5,6 +5,7 @@ __author__ = "Jia-Yuan Zhang"
 __email__ = "jzhang@well.ox.ac.uk"
 
 from . import util
-from .alignment import AlignedSegment, SequenceAlignment, GeneAnnotation
+from .alignment import AlignedSegment, SequenceAlignment
+from .annotation import GeneAnnotation
 from .sequences import DotPlot
 from .widget import GenomeViewer

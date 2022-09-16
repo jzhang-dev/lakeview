@@ -1,4 +1,4 @@
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, List
 import os
 import tempfile
 from numbers import Real
@@ -137,3 +137,44 @@ def download_bam(
     if index and (not os.path.isfile(output_bai_path) or override):
         os.makedirs(os.path.split(output_bai_path)[0], exist_ok=True)
         pysam.index(output_bam_path, output_bai_path)
+
+
+def pack_intervals(intervals: Iterable[Tuple[Real, Real]]) -> List[Real]:
+    """
+    Assign an non-negative offset to each input interval so that intervals sharing the same offset will overlap with each other, while minimising offset values.
+    Intervals are treated as being closed.
+
+    >>> pack_intervals([(1, 2), (3, 4), (1, 3)])
+    [0, 0, 1]
+    """
+    occupied_intervals: List[List[Tuple[Real, Real]]] = [[]]
+    offsets = []
+    for (start, end) in intervals:
+        for offset, intervals in enumerate(occupied_intervals):
+            for occupied_start, occupied_end in intervals:
+                if (
+                    occupied_start <= start <= occupied_end
+                    or occupied_start <= end <= occupied_end
+                ):
+                    break
+            else:
+                # Found place at the current offset.
+                offsets.append(offset)
+                occupied_intervals[offset].append((start, end))
+                break
+        else:
+            # No places available.
+            # Increment the offset.
+            occupied_intervals.append([(start, end)])
+            offsets.append(offset + 1)
+    return offsets
+
+
+def get_ax_size(ax):
+    """
+    Return the size of a given Axes in inches.
+    """
+    fig = ax.figure
+    bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    width, height = bbox.width, bbox.height
+    return (width, height)
