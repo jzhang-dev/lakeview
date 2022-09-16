@@ -26,21 +26,12 @@ from . import helpers, util
 # TODO: aln end postions are exclusive in pysam
 
 
-
-
-
-
-
-
 class TrackPainter:
     pass
 
 
 class Chromosome(TrackPainter):
     pass
-
-
-
 
 
 class CoverageDepth(TrackPainter):
@@ -476,6 +467,33 @@ class AlignedSegment:
         return modified_bases
 
 
+@dataclass
+class LinkedSegment: 
+    segments: List[AlignedSegment]
+
+    @property
+    def reference_start(self):
+        return min(seg.reference_start for seg in self.segments)
+
+    @property
+    def reference_end(self):
+        return max(seg.reference_end for seg in self.segments)
+
+    # def __getattr__(self, name):
+    #     if name in (
+    #         "insertions",
+    #         "deletions",
+    #         "soft_clipping",
+    #         "hard_clipping",
+    #         "mismatched_bases",
+    #         "modified_bases",
+    #     ):
+    #         seg_attr_list = [get_attr(seg, name) for seg in self.segments]
+    #         return list(itertools.chain(*seg_attr_list))
+    #     else:
+    #         return super().__getattr__(self, name)
+
+
 @dataclass(repr=False)
 class SequenceAlignment(TrackPainter):
     segments: List[AlignedSegment]
@@ -563,18 +581,21 @@ class SequenceAlignment(TrackPainter):
             )
 
     @staticmethod
-    def _pack_segments(segments: Sequence[AlignedSegment]) -> np.array:
+    def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence) -> np.array:
+        # TODO: support links 
         intervals = [(seg.reference_start, seg.reference_end) for seg in segments]
         return np.array(helpers.pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
-    def _get_segment_offsets(segments, groups, *, max_group_offset) -> List[int]:
+    def _get_segment_offsets(segments, links, groups, *, max_group_offset) -> List[int]:
+        # TODO: check no segments from differenct groups are linked together
         offsets = np.zeros(len(segments))
         y = 0
         for group in list(sorted(set(groups))):
             group_indices = [i for i, g in enumerate(groups) if g == group]
             group_segments = [segments[i] for i in group_indices]
-            group_offsets = SequenceAlignment._pack_segments(group_segments)
+            group_links = [links[i] for i in group_indices]
+            group_offsets = SequenceAlignment._pack_segments(group_segments, group_links)
             group_offsets[group_offsets > max_group_offset] = -np.inf
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
@@ -584,8 +605,10 @@ class SequenceAlignment(TrackPainter):
         self,
         ax,
         *,
+        mask: Optional[Union[Callable, Iterable]] = None,  # TODO
         groups: Optional[Union[Callable, Iterable]] = None,
         group_labels: Optional[Union[Callable, Iterable]] = None,
+        links: Optional[Union[Callable, Iterable]] = None,  # TODO
         colors: Optional[Union[Callable, Iterable]] = None,
         order: Optional[Union[Callable, Iterable]] = None,
         height=None,
@@ -615,6 +638,10 @@ class SequenceAlignment(TrackPainter):
         letters_kw={},
         group_separators_kw={},
     ):
+        """
+        Groups are ordered by group id.
+        Linked reads are ordered by first read in the link.
+        """
         segments = self.segments
         n_segments = len(segments)
 
@@ -625,9 +652,13 @@ class SequenceAlignment(TrackPainter):
         if isinstance(colors, Callable):
             colors = [colors(seg) for seg in segments]
         if groups is None:
-            groups = [0] * n_segments
+            groups = [0] * n_segments # Assign all segments into the same group
         if isinstance(groups, Callable):
             groups = [groups(seg) for seg in segments]
+        if links is None:
+            links = list(range(n_segments)) # Do not link segments together
+        if isinstance(links, Callable):
+            links = [links(seg) for seg in segments]
         if isinstance(order, Callable):
             order = [order(seg) for seg in segments]
 
@@ -644,7 +675,7 @@ class SequenceAlignment(TrackPainter):
             )
 
         offsets = self._get_segment_offsets(
-            segments, groups, max_group_offset=max_depth - 1
+            segments, links, groups, max_group_offset=max_depth - 1
         )
         segments, colors, groups, offsets = helpers.filter_by(
             segments, colors, groups, offsets, by=offsets >= 0
@@ -1107,7 +1138,7 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         facecolor="lightgray",
-        edgecolor='none',
+        edgecolor="none",
         show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
         min_alt_frequency=0.2,
         min_alt_depth=2,
@@ -1116,7 +1147,9 @@ class SequenceAlignment(TrackPainter):
     ):
         x = list(self.pileup_depths)
         y = list(self.pileup_depths.values())
-        ax.fill_between(x, y1=y, y2=0, step="mid", facecolor=facecolor, edgecolor=edgecolor, **kw)
+        ax.fill_between(
+            x, y1=y, y2=0, step="mid", facecolor=facecolor, edgecolor=edgecolor, **kw
+        )
         ax.set_ylim(bottom=0)
         if show_mismatches:
             self._draw_pileup_mismatches(
