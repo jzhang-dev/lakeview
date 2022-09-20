@@ -583,8 +583,18 @@ class SequenceAlignment(TrackPainter):
     @staticmethod
     def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence) -> np.array:
         # TODO: support links 
-        intervals = [(seg.reference_start, seg.reference_end) for seg in segments]
-        return np.array(helpers.pack_intervals(intervals), dtype=np.float32)
+        linked_seg_dict = collections.defaultdict(list)
+        for seg, link in zip(segments, links):
+            linked_seg_dict[link].append(seg)
+        
+        
+        intervals = []
+        for link, seg_list in linked_seg_dict.items():
+            linked_segment = LinkedSegment(seg_list)
+            intervals.append((linked_segment.reference_start, linked_segment.reference_end))
+        link_offset_dict = {link: offset for link, offset in zip(linked_seg_dict, helpers.pack_intervals(intervals))}
+        segment_offsets = np.array([link_offset_dict[link] for link in links], dtype=np.float32)
+        return segment_offsets
 
     @staticmethod
     def _get_segment_offsets(segments, links, groups, *, max_group_offset) -> List[int]:
@@ -669,14 +679,18 @@ class SequenceAlignment(TrackPainter):
         if order is not None and len(order) != n_segments:
             raise ValueError()
 
+        # Sort segments by user-suppled order
         if order is not None:
-            segments, colors, groups = helpers.sort_by(
-                segments, colors, groups, by=order
+            segments, colors, links, groups = helpers.sort_by(
+                segments, colors, links, groups, by=order
             )
 
+        # Get segment offsets
         offsets = self._get_segment_offsets(
             segments, links, groups, max_group_offset=max_depth - 1
         )
+
+        # Remove segments exceeding `max_group_offset`
         segments, colors, groups, offsets = helpers.filter_by(
             segments, colors, groups, offsets, by=offsets >= 0
         )
