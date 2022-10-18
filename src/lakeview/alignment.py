@@ -468,7 +468,7 @@ class AlignedSegment:
 
 
 @dataclass
-class LinkedSegment: 
+class LinkedSegment:
     segments: List[AlignedSegment]
 
     @property
@@ -581,19 +581,39 @@ class SequenceAlignment(TrackPainter):
             )
 
     @staticmethod
+    def _link_segments(
+        segments: Sequence[AlignedSegment], links: Sequence
+    ) -> Dict[Any, LinkedSegment]:
+        link_seg_dict = collections.defaultdict(list)
+        for seg, link in zip(segments, links):
+            link_seg_dict[link].append(seg)
+        link_ls_dict = {}
+        for link, seg_list in link_seg_dict.items():
+            linked_segment = LinkedSegment(seg_list)
+            link_ls_dict[link] = linked_segment
+        return link_ls_dict
+
+    @staticmethod
     def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence) -> np.array:
-        # TODO: support links 
+        # Link segments
         linked_seg_dict = collections.defaultdict(list)
         for seg, link in zip(segments, links):
             linked_seg_dict[link].append(seg)
-        
-        
+        # Get offset for each LinkedSegment
         intervals = []
         for link, seg_list in linked_seg_dict.items():
             linked_segment = LinkedSegment(seg_list)
-            intervals.append((linked_segment.reference_start, linked_segment.reference_end))
-        link_offset_dict = {link: offset for link, offset in zip(linked_seg_dict, helpers.pack_intervals(intervals))}
-        segment_offsets = np.array([link_offset_dict[link] for link in links], dtype=np.float32)
+            intervals.append(
+                (linked_segment.reference_start, linked_segment.reference_end)
+            )
+        link_offset_dict = {
+            link: offset
+            for link, offset in zip(linked_seg_dict, helpers.pack_intervals(intervals))
+        }
+        # Retrive offset for each individual segment
+        segment_offsets = np.array(
+            [link_offset_dict[link] for link in links], dtype=np.float32
+        )
         return segment_offsets
 
     @staticmethod
@@ -605,7 +625,9 @@ class SequenceAlignment(TrackPainter):
             group_indices = [i for i, g in enumerate(groups) if g == group]
             group_segments = [segments[i] for i in group_indices]
             group_links = [links[i] for i in group_indices]
-            group_offsets = SequenceAlignment._pack_segments(group_segments, group_links)
+            group_offsets = SequenceAlignment._pack_segments(
+                group_segments, group_links
+            )
             group_offsets[group_offsets > max_group_offset] = -np.inf
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
@@ -624,6 +646,7 @@ class SequenceAlignment(TrackPainter):
         height=None,
         show_backbones=True,
         show_arrowheads=True,
+        show_links=True,
         show_insertions=True,
         min_insertion_size=10,
         show_deletions=True,
@@ -639,6 +662,7 @@ class SequenceAlignment(TrackPainter):
         max_depth=1000,
         backbones_kw={},
         arrowheads_kw={},
+        links_kw={},
         insertions_kw={},
         deletions_kw={},
         mismatches_kw={},
@@ -662,11 +686,11 @@ class SequenceAlignment(TrackPainter):
         if isinstance(colors, Callable):
             colors = [colors(seg) for seg in segments]
         if groups is None:
-            groups = [0] * n_segments # Assign all segments into the same group
+            groups = [0] * n_segments  # Assign all segments into the same group
         if isinstance(groups, Callable):
             groups = [groups(seg) for seg in segments]
         if links is None:
-            links = list(range(n_segments)) # Do not link segments together
+            links = list(range(n_segments))  # Do not link segments together
         if isinstance(links, Callable):
             links = [links(seg) for seg in segments]
         if isinstance(order, Callable):
@@ -728,6 +752,8 @@ class SequenceAlignment(TrackPainter):
                 colors=colors,
                 **arrowheads_kw,
             )
+        if show_links:
+            self._draw_links(ax, segments, offsets, links, **links_kw)
         if show_mismatches:
             self._draw_alignment_mismatches(
                 ax, segments, offsets, height=height, **mismatches_kw
@@ -1028,6 +1054,41 @@ class SequenceAlignment(TrackPainter):
             max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
         for y in max_group_offset_dict.values():
             ax.axhline(y + 1, linewidth=linewidth, color=color, linestyle=linestyle)
+
+    def _draw_links(
+        self,
+        ax,
+        segments,
+        offsets,
+        links,
+        *,
+        linewidth=0.5,
+        color="lightgray",
+        linestyle="-",
+        **kw,
+    ):
+        # Link segments
+        link_ls_dict = self._link_segments(segments, links)
+        link_offset_dict = {}
+        for link, y in zip(links, offsets):
+            link_offset_dict[link] = y  # Implicitly assumes each link has only offset
+
+        lines = [
+            (
+                (ls.reference_start, link_offset_dict[link]),
+                (ls.reference_end, link_offset_dict[link]),
+            )
+            for link, ls in link_ls_dict.items()
+        ]
+        ax.add_collection(
+            LineCollection(
+                lines,
+                linewidths=linewidth,
+                colors=color,
+                zorder=-1,
+                facecolors="none",
+            )
+        )
 
     def _draw_soft_clipping(
         self,
