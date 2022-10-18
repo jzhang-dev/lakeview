@@ -141,11 +141,11 @@ def download_bam(
 
 def pack_intervals(intervals: Iterable[Tuple[Real, Real]]) -> List[Real]:
     """
-    Assign an non-negative offset to each input interval so that intervals sharing the same offset will overlap with each other, while minimising offset values.
+    Assign an non-negative offset to each input interval so that intervals sharing the same offset will not overlap with each other, while minimising offset values.
     Intervals are treated as being closed.
 
-    >>> pack_intervals([(1, 2), (3, 4), (1, 3)])
-    [0, 0, 1]
+    >>> pack_intervals([(1, 2), (3, 4), (1, 3), (0, 5)])
+    [0, 0, 1, 2]
     """
     occupied_intervals: List[List[Tuple[Real, Real]]] = [[]]
     offsets = []
@@ -155,6 +155,7 @@ def pack_intervals(intervals: Iterable[Tuple[Real, Real]]) -> List[Real]:
                 if (
                     occupied_start <= start <= occupied_end
                     or occupied_start <= end <= occupied_end
+                    or start <= occupied_start <= end
                 ):
                     break
             else:
