@@ -5,7 +5,7 @@ from __future__ import annotations
 import collections
 from multiprocessing.sharedctypes import Value
 
-from typing import Callable, Iterable, Optional, List, Tuple, Dict, Sequence, Union
+from typing import Any, Callable, Iterable, Optional, List, Tuple, Dict, Sequence, Union
 from numbers import Real
 from dataclasses import dataclass, field
 import warnings
