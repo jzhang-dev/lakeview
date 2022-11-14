@@ -43,6 +43,10 @@ def sort_by(*iterables, by, reverse=False):
     >>> sort_by(a, b, by=r, reverse=False)
     [('b', 'c', 'a'), ('y', 'z', 'x')]
     """
+    # Check iterable lengths are equal
+    if len(set(len(x) for x in iterables)) > 1:
+        raise ValueError("Iterables must have the same length.")
+
     zipped_lists = list(zip(*iterables))
     sorted_zipped_lists = [
         x
@@ -64,6 +68,10 @@ def filter_by(*iterables, by):
     >>> filter_by(a, b, by=f)
     [('a', 'c'), ('x', 'z')]
     """
+    # Check iterable lengths are equal
+    if len(set(len(x) for x in iterables)) > 1:
+        raise ValueError("Iterables must have the same length.")
+
     zipped_lists = list(zip(*iterables))
     filtered_zipped_lists = [x for (x, b) in zip(zipped_lists, by) if b]
     filtered_lists = list(zip(*filtered_zipped_lists))

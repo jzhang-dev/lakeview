@@ -595,20 +595,18 @@ class SequenceAlignment(TrackPainter):
 
     @staticmethod
     def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence) -> np.array:
+        assert len(segments) == len(links)
         # Link segments
-        linked_seg_dict = collections.defaultdict(list)
-        for seg, link in zip(segments, links):
-            linked_seg_dict[link].append(seg)
+        link_ls_dict = SequenceAlignment._link_segments(segments, links)
         # Get offset for each LinkedSegment
         intervals = []
-        for link, seg_list in linked_seg_dict.items():
-            linked_segment = LinkedSegment(seg_list)
+        for link, ls in link_ls_dict.items():
             intervals.append(
-                (linked_segment.reference_start, linked_segment.reference_end)
+                (ls.reference_start, ls.reference_end)
             )
         link_offset_dict = {
             link: offset
-            for link, offset in zip(linked_seg_dict, helpers.pack_intervals(intervals))
+            for link, offset in zip(link_ls_dict, helpers.pack_intervals(intervals))
         }
         # Retrive offset for each individual segment
         segment_offsets = np.array(
@@ -618,6 +616,7 @@ class SequenceAlignment(TrackPainter):
 
     @staticmethod
     def _get_segment_offsets(segments, links, groups, *, max_group_offset) -> List[int]:
+        assert len(segments) == len(links) == len(groups)
         # TODO: check no segments from differenct groups are linked together
         offsets = np.zeros(len(segments))
         y = 0
@@ -715,8 +714,8 @@ class SequenceAlignment(TrackPainter):
         )
 
         # Remove segments exceeding `max_group_offset`
-        segments, colors, groups, offsets = helpers.filter_by(
-            segments, colors, groups, offsets, by=offsets >= 0
+        segments, colors, links, groups, offsets = helpers.filter_by(
+            segments, colors, links, groups, offsets, by=offsets >= 0
         )
 
         if height is None:
@@ -1071,7 +1070,11 @@ class SequenceAlignment(TrackPainter):
         link_ls_dict = self._link_segments(segments, links)
         link_offset_dict = {}
         for link, y in zip(links, offsets):
-            link_offset_dict[link] = y  # Implicitly assumes each link has only offset
+            if link in link_offset_dict:
+                if link_offset_dict[link] != y:
+                    raise ValueError()
+            else:
+                link_offset_dict[link] = y
 
         lines = [
             (
