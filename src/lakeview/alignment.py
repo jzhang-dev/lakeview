@@ -636,12 +636,12 @@ class SequenceAlignment(TrackPainter):
         self,
         ax,
         *,
-        mask: Optional[Union[Callable, Iterable]] = None,  # TODO
-        groups: Optional[Union[Callable, Iterable]] = None,
-        group_labels: Optional[Union[Callable, Iterable]] = None,
-        links: Optional[Union[Callable, Iterable]] = None,  # TODO
-        colors: Optional[Union[Callable, Iterable]] = None,
-        order: Optional[Union[Callable, Iterable]] = None,
+        filter_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
+        group_by: Optional[Union[Callable, Iterable, str]] = None,
+        group_labels: Optional[Union[Callable, Iterable]] = None,  # TODO
+        link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
+        color_by: Optional[Union[Callable, Iterable, str]] = None,
+        sort_by: Optional[Union[Callable, Iterable, str]] = None,
         height=None,
         show_backbones=True,
         show_arrowheads=True,
@@ -680,34 +680,67 @@ class SequenceAlignment(TrackPainter):
 
         if segments is None:
             raise ValueError("Alignment has not been loaded.")
-        if colors is None:
-            colors = ["lightgray"] * n_segments
-        if isinstance(colors, Callable):
-            colors = [colors(seg) for seg in segments]
-        if groups is None:
-            groups = [0] * n_segments  # Assign all segments into the same group
-        if isinstance(groups, Callable):
-            groups = [groups(seg) for seg in segments]
-        if links is None:
-            links = list(range(n_segments))  # Do not link segments together
-        if isinstance(links, Callable):
-            links = [links(seg) for seg in segments]
-        if isinstance(order, Callable):
-            order = [order(seg) for seg in segments]
 
-        if len(groups) != n_segments:
+        # Colors
+        if color_by is None:
+            colors = ["lightgray"] * n_segments
+        elif color_by == 'strand':
+            color_by=lambda segment: "lightgray" if segment.is_forward else "darkgray" # TODO: better colors
+        elif isinstance(color_by, str):
             raise ValueError()
+        elif isinstance(color_by, Iterable):
+            colors = list(color_by) 
+        if isinstance(color_by, Callable):
+            colors = [color_by(seg) for seg in segments]
         if len(colors) != n_segments:
             raise ValueError()
-        if order is not None and len(order) != n_segments:
+
+        # Groups
+        if group_by is None:
+            groups = [0] * n_segments  # Assign all segments into the same group
+        elif group_by == 'strand':
+            group_by=lambda segment: 0 if segment.is_forward else 1
+        elif isinstance(group_by, str):
+            raise ValueError()
+        elif isinstance(group_by, Iterable):
+            groups = list(group_by) 
+        if isinstance(group_by, Callable):
+            groups = [group_by(seg) for seg in segments]
+        if len(groups) != n_segments:
             raise ValueError()
 
-        # Sort segments by user-suppled order
-        if order is not None:
-            segments, colors, links, groups = helpers.sort_by(
-                segments, colors, links, groups, by=order
-            )
+        # Links
+        if link_by is None:
+            links = list(range(n_segments))  # Do not link segments together
+        elif link_by == 'pair':
+            pass # TODO
+        elif link_by == 'name':
+            link_by = lambda seg: seg.query_name
+        elif isinstance(link_by, str):
+            raise ValueError()
+        elif isinstance(link_by, Iterable):
+            links = list(link_by)
+        if isinstance(link_by, Callable):
+            links = [link_by(seg) for seg in segments]
 
+        # Sort segments
+        if sort_by == "start":
+            sort_by = lambda seg: seg.reference_start
+        elif sort_by == 'length':
+            sort_by = lambda seg: seg.query_alignment_length
+        elif isinstance(sort_by, str):
+            raise ValueError()
+        elif isinstance(sort_by, Iterable):
+            keys = list(sort_by)
+        if isinstance(sort_by, Callable):
+            keys = [sort_by(seg) for seg in segments]
+        if sort_by is not None:
+            if keys is not None and len(keys) != n_segments:
+                raise ValueError()
+            segments, colors, links, groups = helpers.sort_by(
+                segments, colors, links, groups, by=keys
+            )
+        
         # Get segment offsets
         offsets = self._get_segment_offsets(
             segments, links, groups, max_group_offset=max_depth - 1
