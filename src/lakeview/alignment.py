@@ -601,9 +601,7 @@ class SequenceAlignment(TrackPainter):
         # Get offset for each LinkedSegment
         intervals = []
         for link, ls in link_ls_dict.items():
-            intervals.append(
-                (ls.reference_start, ls.reference_end)
-            )
+            intervals.append((ls.reference_start, ls.reference_end))
         link_offset_dict = {
             link: offset
             for link, offset in zip(link_ls_dict, helpers.pack_intervals(intervals))
@@ -684,12 +682,14 @@ class SequenceAlignment(TrackPainter):
         # Colors
         if color_by is None:
             colors = ["lightgray"] * n_segments
-        elif color_by == 'strand':
-            color_by=lambda segment: "lightgray" if segment.is_forward else "darkgray" # TODO: better colors
+        elif color_by == "strand":
+            color_by = (
+                lambda segment: "lightgray" if segment.is_forward else "darkgray"
+            )  # TODO: better colors
         elif isinstance(color_by, str):
             raise ValueError()
         elif isinstance(color_by, Iterable):
-            colors = list(color_by) 
+            colors = list(color_by)
         if isinstance(color_by, Callable):
             colors = [color_by(seg) for seg in segments]
         if len(colors) != n_segments:
@@ -698,12 +698,12 @@ class SequenceAlignment(TrackPainter):
         # Groups
         if group_by is None:
             groups = [0] * n_segments  # Assign all segments into the same group
-        elif group_by == 'strand':
-            group_by=lambda segment: 0 if segment.is_forward else 1
+        elif group_by == "strand":
+            group_by = lambda segment: 0 if segment.is_forward else 1
         elif isinstance(group_by, str):
             raise ValueError()
         elif isinstance(group_by, Iterable):
-            groups = list(group_by) 
+            groups = list(group_by)
         if isinstance(group_by, Callable):
             groups = [group_by(seg) for seg in segments]
         if len(groups) != n_segments:
@@ -712,9 +712,9 @@ class SequenceAlignment(TrackPainter):
         # Links
         if link_by is None:
             links = list(range(n_segments))  # Do not link segments together
-        elif link_by == 'pair':
-            pass # TODO
-        elif link_by == 'name':
+        elif link_by == "pair":
+            pass  # TODO
+        elif link_by == "name":
             link_by = lambda seg: seg.query_name
         elif isinstance(link_by, str):
             raise ValueError()
@@ -726,7 +726,7 @@ class SequenceAlignment(TrackPainter):
         # Sort segments
         if sort_by == "start":
             sort_by = lambda seg: seg.reference_start
-        elif sort_by == 'length':
+        elif sort_by == "length":
             sort_by = lambda seg: seg.query_alignment_length
         elif isinstance(sort_by, str):
             raise ValueError()
@@ -740,7 +740,7 @@ class SequenceAlignment(TrackPainter):
             segments, colors, links, groups = helpers.sort_by(
                 segments, colors, links, groups, by=keys
             )
-        
+
         # Get segment offsets
         offsets = self._get_segment_offsets(
             segments, links, groups, max_group_offset=max_depth - 1
