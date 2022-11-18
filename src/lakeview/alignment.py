@@ -814,13 +814,7 @@ class SequenceAlignment(TrackPainter):
         if height is None:
             height = self._get_default_segment_height(ax, offsets)
 
-        # Set axis limits
-        ax.set_xlim(
-            min(segment.reference_start for segment in segments),
-            max(segment.reference_end for segment in segments),
-        )
-        ax.set_ylim(max(offsets) + 1, min(offsets) - 1)
-        ax.set_yticks([])
+        
 
         # Draw components
         if show_backbones:
@@ -891,6 +885,15 @@ class SequenceAlignment(TrackPainter):
             )
         if show_group_separators:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
+
+
+        # Set axis limits
+        ax.set_xlim(
+            min(segment.reference_start for segment in segments),
+            max(segment.reference_end for segment in segments),
+        )
+        ax.set_ylim(max(offsets) + 1, min(offsets) - 1)
+        ax.set_yticks([])
 
     def _draw_backbones(self, ax, segments, offsets, height, *, colors, **kw):
         lines = [
@@ -1299,32 +1302,6 @@ class SequenceAlignment(TrackPainter):
                 markerfacecolor="none",
                 markeredgewidth=linewidth,
                 ls="",
-            )
-
-    def draw_pileup(
-        self,
-        ax,
-        *,
-        facecolor="lightgray",
-        edgecolor="none",
-        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
-        min_alt_frequency=0.2,
-        min_alt_depth=2,
-        mismatch_kw={},
-        **kw,
-    ):
-        x = list(self.pileup_depths)
-        y = list(self.pileup_depths.values())
-        ax.fill_between(
-            x, y1=y, y2=0, step="mid", facecolor=facecolor, edgecolor=edgecolor, **kw
-        )
-        ax.set_ylim(bottom=0)
-        if show_mismatches:
-            self._draw_pileup_mismatches(
-                ax,
-                min_alt_frequency=min_alt_frequency,
-                min_alt_depth=min_alt_depth,
-                **mismatch_kw,
             )
 
     def _draw_pileup_mismatches(
