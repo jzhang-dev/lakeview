@@ -638,7 +638,7 @@ class SequenceAlignment(TrackPainter):
         link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
         color_by: Optional[Union[Callable, Iterable, str]] = None,
         sort_by: Optional[Union[Callable, Iterable, str]] = None,
-        max_depth: Optional[int] = None,
+        max_depth: Optional[int] = 1000,
     ):
         segments = self.segments
         n_segments = len(segments)
@@ -649,6 +649,8 @@ class SequenceAlignment(TrackPainter):
         # Colors
         if color_by is None:
             colors = ["lightgray"] * n_segments
+        elif color_by == 'random':
+            color_by = lambda segment: "lightgray" # TODO: random colors
         elif color_by == "strand":
             color_by = (
                 lambda segment: "lightgray" if segment.is_forward else "darkgray"
