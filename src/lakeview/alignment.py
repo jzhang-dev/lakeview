@@ -630,49 +630,16 @@ class SequenceAlignment(TrackPainter):
             y = max(offsets) + 2
         return offsets
 
-    def draw_alignment(
+    def _parse_alignment_parameters(
         self,
-        ax,
         *,
         filter_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
         group_by: Optional[Union[Callable, Iterable, str]] = None,
-        group_labels: Optional[Union[Callable, Iterable]] = None,  # TODO
         link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
         color_by: Optional[Union[Callable, Iterable, str]] = None,
         sort_by: Optional[Union[Callable, Iterable, str]] = None,
-        height=None,
-        show_backbones=True,
-        show_arrowheads=True,
-        show_links=True,
-        show_insertions=True,
-        min_insertion_size=10,
-        show_deletions=True,
-        min_deletion_size=10,
-        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
-        show_modified_bases=False,
-        show_soft_clipping=True,
-        min_soft_clipping_size=10,
-        show_hard_clipping=True,
-        min_hard_clipping_size=10,
-        show_letters=False,
-        show_group_separators=True,
-        max_depth=1000,
-        backbones_kw={},
-        arrowheads_kw={},
-        links_kw={},
-        insertions_kw={},
-        deletions_kw={},
-        mismatches_kw={},
-        modified_bases_kw={},
-        soft_clipping_kw={},
-        hard_clipping_kw={},
-        letters_kw={},
-        group_separators_kw={},
+        max_depth: Optional[int] = None,
     ):
-        """
-        Groups are ordered by group id.
-        Linked reads are ordered by first read in the link.
-        """
         segments = self.segments
         n_segments = len(segments)
 
@@ -751,14 +718,81 @@ class SequenceAlignment(TrackPainter):
             segments, colors, links, groups, offsets, by=offsets >= 0
         )
 
-        if height is None:
-            _, ax_height = helpers.get_ax_size(ax)
-            height = max(
-                2,
-                ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,
-            )
-            height = min(height, 10)
+        return segments, colors, links, groups, offsets
 
+    def _get_default_segment_height(self, ax, offsets, *, min_height=2, max_height = 10):
+        _, ax_height = helpers.get_ax_size(ax)
+        height = max(
+            min_height,
+            ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,
+        )
+        height = min(height, max_height)
+        return height
+
+    def draw_alignment(
+        self,
+        ax,
+        *,
+        filter_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
+        group_by: Optional[Union[Callable, Iterable, str]] = None,
+        group_labels: Optional[Union[Callable, Iterable]] = None,  # TODO
+        link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
+        color_by: Optional[Union[Callable, Iterable, str]] = None,
+        sort_by: Optional[Union[Callable, Iterable, str]] = None,
+        height=None,
+        show_backbones=True,
+        show_arrowheads=True,
+        show_links=True,
+        show_insertions=True,
+        min_insertion_size=10,
+        show_deletions=True,
+        min_deletion_size=10,
+        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
+        show_modified_bases=False,
+        show_soft_clipping=True,
+        min_soft_clipping_size=10,
+        show_hard_clipping=True,
+        min_hard_clipping_size=10,
+        show_letters=False,
+        show_group_separators=True,
+        max_depth=1000,
+        backbones_kw={},
+        arrowheads_kw={},
+        links_kw={},
+        insertions_kw={},
+        deletions_kw={},
+        mismatches_kw={},
+        modified_bases_kw={},
+        soft_clipping_kw={},
+        hard_clipping_kw={},
+        letters_kw={},
+        group_separators_kw={},
+    ):
+        """
+        Groups are ordered by group id.
+        Linked reads are ordered by first read in the link.
+        """
+        segments = self.segments
+        n_segments = len(segments)
+
+        if segments is None:
+            raise ValueError("Alignment has not been loaded.")
+
+        # Get runtime parameters
+        segments, colors, links, groups, offsets = self._parse_alignment_parameters(
+            filter_by=filter_by,
+            group_by=group_by,
+            link_by=link_by,
+            color_by=color_by,
+            sort_by=sort_by,
+            max_depth=max_depth
+        )
+
+        # Get segment height
+        if height is None:
+            height = self._get_default_segment_height(ax, offsets)
+
+        # Set axis limits
         ax.set_xlim(
             min(segment.reference_start for segment in segments),
             max(segment.reference_end for segment in segments),
@@ -766,6 +800,7 @@ class SequenceAlignment(TrackPainter):
         ax.set_ylim(max(offsets) + 1, min(offsets) - 1)
         ax.set_yticks([])
 
+        # Draw components
         if show_backbones:
             self._draw_backbones(
                 ax,
