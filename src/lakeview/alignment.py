@@ -697,6 +697,19 @@ class SequenceAlignment(TrackPainter):
         if isinstance(link_by, Callable):
             links = [link_by(seg) for seg in segments]
 
+        # Filter segments
+        if filter_by is None:
+            selection = [True] * n_segments # No filtering
+        elif filter_by == "no_secondary":
+            filter_by = lambda seg: not seg.is_secondary
+        elif isinstance(filter_by, str):
+            raise ValueError()
+        elif isinstance(filter_by, Iterable):
+            selection = list(filter_by)
+        if isinstance(filter_by, Callable):
+            selection = [filter_by(seg) for seg in segments]
+        # TODO: implement filtering
+
         # Sort segments
         if sort_by == "start":
             sort_by = lambda seg: seg.reference_start
