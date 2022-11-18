@@ -594,7 +594,9 @@ class SequenceAlignment(TrackPainter):
         return link_ls_dict
 
     @staticmethod
-    def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence, *, padding=0) -> np.array:
+    def _pack_segments(
+        segments: Sequence[AlignedSegment], links: Sequence, *, padding=0
+    ) -> np.array:
         assert len(segments) == len(links)
         # Link segments
         link_ls_dict = SequenceAlignment._link_segments(segments, links)
@@ -613,7 +615,9 @@ class SequenceAlignment(TrackPainter):
         return segment_offsets
 
     @staticmethod
-    def _get_segment_offsets(segments, links, groups, *, max_group_offset, min_spacing) -> List[int]:
+    def _get_segment_offsets(
+        segments, links, groups, *, max_group_offset, min_spacing
+    ) -> List[int]:
         assert len(segments) == len(links) == len(groups)
         # TODO: check no segments from differenct groups are linked together
         offsets = np.zeros(len(segments))
@@ -623,9 +627,9 @@ class SequenceAlignment(TrackPainter):
             group_segments = [segments[i] for i in group_indices]
             group_links = [links[i] for i in group_indices]
             group_offsets = SequenceAlignment._pack_segments(
-                group_segments, group_links, padding=min_spacing/2
+                group_segments, group_links, padding=min_spacing / 2
             )
-            group_offsets[group_offsets > max_group_offset] = -np.inf 
+            group_offsets[group_offsets > max_group_offset] = -np.inf
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
         return offsets
@@ -638,8 +642,8 @@ class SequenceAlignment(TrackPainter):
         link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
         color_by: Optional[Union[Callable, Iterable, str]] = None,
         sort_by: Optional[Union[Callable, Iterable, str]] = None,
-        max_depth: Optional[int] = 1000,
-        min_spacing: Optional[Real] = None
+        max_group_offset: Optional[Real] = float("inf"),
+        min_spacing: Optional[Real] = None,
     ):
         segments = self.segments
         n_segments = len(segments)
@@ -650,8 +654,8 @@ class SequenceAlignment(TrackPainter):
         # Colors
         if color_by is None:
             colors = ["lightgray"] * n_segments
-        elif color_by == 'random':
-            color_by = lambda segment: "lightgray" # TODO: random colors
+        elif color_by == "random":
+            color_by = lambda segment: "lightgray"  # TODO: random colors
         elif color_by == "strand":
             color_by = (
                 lambda segment: "lightgray" if segment.is_forward else "darkgray"
@@ -713,11 +717,15 @@ class SequenceAlignment(TrackPainter):
 
         # Get default spacing
         if min_spacing is None:
-            min_spacing  = self._get_default_spacing(segments)
+            min_spacing = self._get_default_spacing(segments)
 
         # Get segment offsets
         offsets = self._get_segment_offsets(
-            segments, links, groups, max_group_offset=max_depth - 1, min_spacing=min_spacing
+            segments,
+            links,
+            groups,
+            max_group_offset=max_group_offset,
+            min_spacing=min_spacing,
         )
 
         # Remove segments exceeding `max_group_offset`
@@ -727,7 +735,7 @@ class SequenceAlignment(TrackPainter):
 
         return segments, colors, links, groups, offsets
 
-    def _get_default_segment_height(self, ax, offsets, *, min_height=2, max_height = 10):
+    def _get_default_segment_height(self, ax, offsets, *, min_height=2, max_height=10):
         _, ax_height = helpers.get_ax_size(ax)
         height = max(
             min_height,
@@ -798,7 +806,7 @@ class SequenceAlignment(TrackPainter):
             link_by=link_by,
             color_by=color_by,
             sort_by=sort_by,
-            max_depth=max_group_height,
+            max_group_offset=max_group_height - 1,
             min_spacing=min_spacing,
         )
 
