@@ -699,7 +699,7 @@ class SequenceAlignment(TrackPainter):
 
         # Filter segments
         if filter_by is None:
-            selection = [True] * n_segments # No filtering
+            selection = [True] * n_segments  # No filtering
         elif filter_by == "no_secondary":
             filter_by = lambda seg: not seg.is_secondary
         elif isinstance(filter_by, str):
@@ -746,7 +746,7 @@ class SequenceAlignment(TrackPainter):
             segments, colors, links, groups, offsets, by=offsets >= 0
         )
 
-        return segments, colors, links, groups, offsets
+        return segments, links, groups, offsets, colors
 
     def _get_default_segment_height(self, ax, offsets, *, min_height=2, max_height=10):
         _, ax_height = helpers.get_ax_size(ax)
@@ -813,7 +813,7 @@ class SequenceAlignment(TrackPainter):
             raise ValueError("Alignment has not been loaded.")
 
         # Get runtime parameters
-        segments, colors, links, groups, offsets = self._parse_alignment_parameters(
+        segments, links, groups, offsets, colors = self._parse_alignment_parameters(
             filter_by=filter_by,
             group_by=group_by,
             link_by=link_by,
@@ -826,8 +826,6 @@ class SequenceAlignment(TrackPainter):
         # Get segment height
         if height is None:
             height = self._get_default_segment_height(ax, offsets)
-
-        
 
         # Draw components
         if show_backbones:
@@ -898,7 +896,6 @@ class SequenceAlignment(TrackPainter):
             )
         if show_group_separators:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
-
 
         # Set axis limits
         ax.set_xlim(
