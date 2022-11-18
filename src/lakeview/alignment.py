@@ -594,14 +594,14 @@ class SequenceAlignment(TrackPainter):
         return link_ls_dict
 
     @staticmethod
-    def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence) -> np.array:
+    def _pack_segments(segments: Sequence[AlignedSegment], links: Sequence, *, padding=0) -> np.array:
         assert len(segments) == len(links)
         # Link segments
         link_ls_dict = SequenceAlignment._link_segments(segments, links)
         # Get offset for each LinkedSegment
         intervals = []
         for link, ls in link_ls_dict.items():
-            intervals.append((ls.reference_start, ls.reference_end))
+            intervals.append((ls.reference_start - padding, ls.reference_end + padding))
         link_offset_dict = {
             link: offset
             for link, offset in zip(link_ls_dict, helpers.pack_intervals(intervals))
@@ -613,7 +613,7 @@ class SequenceAlignment(TrackPainter):
         return segment_offsets
 
     @staticmethod
-    def _get_segment_offsets(segments, links, groups, *, max_group_offset) -> List[int]:
+    def _get_segment_offsets(segments, links, groups, *, max_group_offset, min_spacing) -> List[int]:
         assert len(segments) == len(links) == len(groups)
         # TODO: check no segments from differenct groups are linked together
         offsets = np.zeros(len(segments))
@@ -623,9 +623,9 @@ class SequenceAlignment(TrackPainter):
             group_segments = [segments[i] for i in group_indices]
             group_links = [links[i] for i in group_indices]
             group_offsets = SequenceAlignment._pack_segments(
-                group_segments, group_links
+                group_segments, group_links, padding=min_spacing/2
             )
-            group_offsets[group_offsets > max_group_offset] = -np.inf
+            group_offsets[group_offsets > max_group_offset] = -np.inf 
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
         return offsets
@@ -639,6 +639,7 @@ class SequenceAlignment(TrackPainter):
         color_by: Optional[Union[Callable, Iterable, str]] = None,
         sort_by: Optional[Union[Callable, Iterable, str]] = None,
         max_depth: Optional[int] = 1000,
+        min_spacing: Optional[Real] = None
     ):
         segments = self.segments
         n_segments = len(segments)
@@ -710,9 +711,13 @@ class SequenceAlignment(TrackPainter):
                 segments, colors, links, groups, by=keys
             )
 
+        # Get default spacing
+        if min_spacing is None:
+            min_spacing  = self._get_default_spacing(segments)
+
         # Get segment offsets
         offsets = self._get_segment_offsets(
-            segments, links, groups, max_group_offset=max_depth - 1
+            segments, links, groups, max_group_offset=max_depth - 1, min_spacing=min_spacing
         )
 
         # Remove segments exceeding `max_group_offset`
@@ -731,6 +736,11 @@ class SequenceAlignment(TrackPainter):
         height = min(height, max_height)
         return height
 
+    def _get_default_spacing(self, segments) -> Real:
+        segment_lengths = [seg.query_alignment_length for seg in segments]
+        spacing = np.median(segment_lengths) * 0.1
+        return spacing
+
     def draw_alignment(
         self,
         ax,
@@ -742,6 +752,7 @@ class SequenceAlignment(TrackPainter):
         color_by: Optional[Union[Callable, Iterable, str]] = None,
         sort_by: Optional[Union[Callable, Iterable, str]] = None,
         height=None,
+        min_spacing: Optional[Real] = None,
         show_backbones=True,
         show_arrowheads=True,
         show_links=True,
@@ -757,7 +768,7 @@ class SequenceAlignment(TrackPainter):
         min_hard_clipping_size=10,
         show_letters=False,
         show_group_separators=True,
-        max_depth=1000,
+        max_group_height=1000,
         backbones_kw={},
         arrowheads_kw={},
         links_kw={},
@@ -787,7 +798,8 @@ class SequenceAlignment(TrackPainter):
             link_by=link_by,
             color_by=color_by,
             sort_by=sort_by,
-            max_depth=max_depth
+            max_depth=max_group_height,
+            min_spacing=min_spacing,
         )
 
         # Get segment height
