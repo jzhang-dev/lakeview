@@ -19,11 +19,9 @@ import pysam
 from . import helpers, util
 
 # TODO: label metadata
-# Integer mode; ref skips
-# Binder
+# Ref skips
 # Get query sequence by position
 # Max depth marker
-# TODO: aln end postions are exclusive in pysam
 
 
 class TrackPainter:
@@ -85,170 +83,6 @@ class MismatchedBase:
     depth: int = 1
 
 
-# A wrapper around pysam.AlignedSegment
-@dataclass(repr=False)
-class AlignedSegment:
-    wrapped: pysam.AlignedSegment
-    alignment: Optional[SequenceAlignment] = None
-
-    def __getattr__(self, name):
-        return getattr(self.wrapped, name)
-
-    @functools.cached_property
-    def reference_position_dict(self):
-        return {
-            qry_pos: ref_pos
-            for qry_pos, ref_pos in self.get_aligned_pairs()
-            if qry_pos is not None
-        }
-
-    def get_aligned_reference_position(self, query_position: int) -> Optional[int]:
-        return self.reference_position_dict[query_position]
-
-    def get_query_base(self, reference_position: int) -> int:
-        pass  # TODO
-
-    @staticmethod
-    def parse_cigartuples(cigartuples):
-        insertions = []
-        deletions = []
-        mismatched_bases = []
-        ref_offset = 0
-        qry_offset = 0
-        found_op_match = False
-        for operation, length in cigartuples:
-            if operation == 0:  # Alignment match; may not be a sequence match
-                found_op_match = True
-            elif operation == 1:  # Insertion
-                insertions.append(Insertion(reference_offset=ref_offset, size=length))
-            elif operation == 2:  # Deletion
-                deletions.append(Deletion(reference_offset=ref_offset, size=length))
-            # elif operation == 7:  # Sequence match
-            #     found_op_equal = True
-            elif operation == 8:  # Mismatched bases
-                mismatched_bases += [
-                    AlignedBase(
-                        reference_offset=ref_offset + i, query_offset=qry_offset + i
-                    )
-                    for i in range(length)
-                ]
-            if operation in (0, 2, 3, 7, 8):
-                # Only these operations 'consume reference'
-                ref_offset += length
-            if operation in (0, 1, 4, 7, 8):
-                # Only these operations 'consume query'
-                qry_offset += length
-            if operation == 9:
-                # TODO: check Operation 9 (BAM_CBACK)
-                raise ValueError(f"operation={operation}")
-            if found_op_match:
-                # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
-                mismatched_bases = None
-        return insertions, deletions, mismatched_bases
-
-    @functools.cached_property
-    def _cigar_differences(self):
-        insertions, deletions, mismatched_bases = self.parse_cigartuples(
-            self.cigartuples
-        )
-        reference_start = self.reference_start
-        for i in insertions:
-            i.reference_position = reference_start + i.reference_offset
-        for d in deletions:
-            d.reference_position = reference_start + d.reference_offset
-        return insertions, deletions, mismatched_bases
-
-    @property
-    def insertions(self):
-        return self._cigar_differences[0]
-
-    @property
-    def deletions(self):
-        return self._cigar_differences[1]
-
-    @functools.cached_property
-    def mismatched_bases(self):
-        query_sequence = self.query_sequence
-        mismatched_bases = self._cigar_differences[2]
-        if mismatched_bases is not None:
-            reference_start = self.reference_start
-            for m in mismatched_bases:
-                m.reference_position = reference_start + m.reference_offset
-                m.query_position = m.query_offset
-                m.query_base = query_sequence[m.query_position]
-        elif self.has_tag("MD"):
-            # M operations present in CIGAR string instead of =/X operations.
-            # Fall back to parsing the MD tag.
-            mismatched_bases = []
-            for qry_pos, ref_pos, ref_base in self.get_aligned_pairs(
-                matches_only=True, with_seq=True
-            ):
-                qry_base = query_sequence[qry_pos]
-                if qry_base != ref_base:
-                    mismatched_bases.append(
-                        AlignedBase(
-                            reference_position=ref_pos,
-                            query_position=qry_pos,
-                            reference_base=ref_base,
-                            query_base=qry_base,
-                        )
-                    )
-        elif self.alignment and self.alignment.reference_sequence:
-            # MD tag not present.
-            # Fall back to checking user-supplied reference sequence.
-            reference_sequence = self.alignment.reference_sequence
-            for qry_pos, ref_pos in self.get_aligned_pairs(
-                matches_only=True, with_seq=False
-            ):
-                ref_base = reference_sequence[ref_pos]
-                qry_base = query_sequence[qry_pos]
-                if qry_base != ref_base:
-                    mismatched_bases.append(
-                        AlignedBase(
-                            reference_position=ref_pos,
-                            query_position=qry_pos,
-                            reference_base=ref_base,
-                            query_base=qry_base,
-                        )
-                    )
-        else:
-            # All methods failed. Notify the user.
-            raise RuntimeError(
-                "Failed to obtain mismatched bases using CIGAR string or the MD tag. Please provide the reference sequence."
-            )
-        return mismatched_bases
-
-    @functools.cached_property
-    def modified_bases(self) -> List[ModifiedBase]:
-        modified_bases = []
-        for (
-            (
-                canonical_base,
-                strand,
-                modification,
-            ),
-            data,
-        ) in self.wrapped.modified_bases.items():
-            strand = {0: "+", 1: "-"}[strand]
-            for pos, qual in data:
-                if qual == -1:
-                    probability = None
-                else:
-                    probability = qual / 256
-                reference_position = self.get_aligned_reference_position(pos)
-                if reference_position is not None:
-                    modified_bases.append(
-                        ModifiedBase(
-                            reference_position=self.get_aligned_reference_position(pos),
-                            canonical_base=canonical_base,
-                            modification=modification,
-                            strand=strand,
-                            probability=probability,
-                        )
-                    )
-        return modified_bases
-
-
 @dataclass
 class ClippedBases:
     reference_offset: int
@@ -295,11 +129,11 @@ class CIGAR:
                 deletions.append(Deletion(reference_offset=ref_offset, size=length))
             elif operation == 4:  # Soft clipping
                 soft_clipping.append(
-                    SoftClippedBases(size=length, reference_offset=ref_offset + 0.5)
+                    SoftClippedBases(size=length, reference_offset=ref_offset - 0.5)
                 )
             elif operation == 5:  # Hard clipping
                 hard_clipping.append(
-                    HardClippedBases(size=length, reference_offset=ref_offset + 0.5)
+                    HardClippedBases(size=length, reference_offset=ref_offset - 0.5)
                 )
             elif operation == 8:  # Mismatched bases
                 mismatched_bases += [
@@ -907,7 +741,7 @@ class SequenceAlignment(TrackPainter):
 
     def _draw_backbones(self, ax, segments, offsets, height, *, colors, **kw):
         lines = [
-            ((seg.reference_start, y), (seg.reference_end, y))
+            ((seg.reference_start-0.5, y), (seg.reference_end-0.5, y))
             for seg, y in zip(segments, offsets)
         ]
         ax.add_collection(
@@ -922,9 +756,9 @@ class SequenceAlignment(TrackPainter):
 
     def _draw_arrowheads(self, ax, segments, offsets, height, *, colors, **kw):
 
-        forward_xs = [seg.reference_end for seg in segments if seg.is_forward]
+        forward_xs = [seg.reference_end-0.5 for seg in segments if seg.is_forward]
         forward_ys = [y for seg, y in zip(segments, offsets) if seg.is_forward]
-        reverse_xs = [seg.reference_start for seg in segments if seg.is_reverse]
+        reverse_xs = [seg.reference_start-0.5 for seg in segments if seg.is_reverse]
         reverse_ys = [y for seg, y in zip(segments, offsets) if seg.is_reverse]
         forward_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5), (0, 0.5)], readonly=True)
         reverse_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5), (0, 0.5)], readonly=True)
@@ -980,7 +814,7 @@ class SequenceAlignment(TrackPainter):
     ):
         xs_dict = collections.defaultdict(list)
         ys_dict = collections.defaultdict(list)
-        marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
+        marker = Path([(0, 0.5), (0, -0.5)], readonly=True) # Optimally, when zoomed-in at single-base level, the mismatche marker should extend to 1-base width. For simplicity, this is not currently supported.
 
         for seg, y in zip(segments, offsets):
             for mb in seg.mismatched_bases:
@@ -1016,7 +850,7 @@ class SequenceAlignment(TrackPainter):
         **kw,
     ):
         marker = Path(
-            [(-0.2, 0.5), (0.2, 0.5), (0, 0.5), (0, -0.5), (-0.2, -0.5), (0.2, -0.5)],
+            [(-0.2, 0.5), (0.2, 0.5), (0.5, 0.5), (0, -0.5), (-0.2, -0.5), (0.2, -0.5)],
             [
                 Path.MOVETO,
                 Path.LINETO,
@@ -1060,7 +894,7 @@ class SequenceAlignment(TrackPainter):
         linewidth=1.5,
         **kw,
     ):
-        marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
+        marker = Path([(0, 0.5), (0, -0.5)], readonly=True) # This marker prevents the deletion from being invisible when zoomed out.
         lines = []
         xs = []
         ys = []
@@ -1068,7 +902,7 @@ class SequenceAlignment(TrackPainter):
         for seg, y in zip(segments, offsets):
             deletions = [d for d in seg.deletions if d.size >= min_deletion_size]
             lines += [
-                ((d.reference_position, y), (d.reference_position + d.size, y))
+                ((d.reference_position-0.5, y), (d.reference_position-0.5 + d.size, y)) # The reference_position for a deletion is the first deleted base
                 for d in deletions
             ]
             xs += [d.reference_position + d.size / 2 for d in deletions]
@@ -1181,8 +1015,8 @@ class SequenceAlignment(TrackPainter):
 
         lines = [
             (
-                (ls.reference_start, link_offset_dict[link]),
-                (ls.reference_end, link_offset_dict[link]),
+                (ls.reference_start-0.5, link_offset_dict[link]),
+                (ls.reference_end-0.5, link_offset_dict[link]),
             )
             for link, ls in link_ls_dict.items()
         ]
