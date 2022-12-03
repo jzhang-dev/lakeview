@@ -303,7 +303,7 @@ class GeneAnnotation:
         colors=None,
         order=None,
         labels=None,
-        max_group_depth=float("inf"),
+        max_group_height=float("inf"),
         transcripts_kw={},
         exons_kw={},
         cdss_kw={},
@@ -337,7 +337,7 @@ class GeneAnnotation:
             )
 
         offsets = self._get_transcript_offsets(
-            transcripts, groups, max_group_offset=max_group_depth - 1
+            transcripts, groups, max_group_offset=max_group_height - 1
         )
         transcripts, colors, groups, labels, offsets = helpers.filter_by(
             transcripts, colors, groups, labels, offsets, by=offsets >= 0

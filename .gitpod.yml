@@ -7,13 +7,13 @@ tasks:
       pip install -ve . &&
       gp sync-done install_lakeview
   
-  - name: run_notebooks
-    init: | 
-      gp sync-await install_lakeview
-      jupyter nbconvert --to html --execute docs/examples/HG002_IGH/HG002_IGH.py.ipynb --output=HG002_IGH.py.ipynb.html
-      jupyter nbconvert --to html --execute docs/examples/HG002_GNAS_WES/HG002_GNAS_WES.py.ipynb --output=HG002_GNAS_WES.py.ipynb.html
-      jupyter nbconvert --to html --execute docs/examples/IGH_dot_plot/IGH_dot_plot.py.ipynb --output=IGH_dot_plot.py.ipynb.html
-      jupyter nbconvert --to html --execute docs/examples/SKBR3/SKBR3.py.ipynb --output=SKBR3.py.ipynb.html
+  # - name: run_notebooks
+  #   init: | 
+  #     gp sync-await install_lakeview
+  #     jupyter nbconvert --to html --execute docs/examples/HG002_IGH/HG002_IGH.py.ipynb --output=HG002_IGH.py.ipynb.html
+  #     jupyter nbconvert --to html --execute docs/examples/HG002_GNAS_WES/HG002_GNAS_WES.py.ipynb --output=HG002_GNAS_WES.py.ipynb.html
+  #     jupyter nbconvert --to html --execute docs/examples/IGH_dot_plot/IGH_dot_plot.py.ipynb --output=IGH_dot_plot.py.ipynb.html
+  #     jupyter nbconvert --to html --execute docs/examples/SKBR3/SKBR3.py.ipynb --output=SKBR3.py.ipynb.html
 
     
   - name: run_jupyterlab
