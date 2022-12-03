@@ -4,7 +4,6 @@ import tempfile
 from numbers import Real
 import matplotlib as mpl
 from matplotlib.colors import rgb2hex
-from matplotlib import cm
 import pysam
 
 
@@ -22,7 +21,7 @@ def get_cmap_colors(cmap_name, format_="hex"):
      '#e5c494',
      '#b3b3b3']
     """
-    cmap = cm.get_cmap(cmap_name, 256)
+    cmap = mpl.colormaps.get_cmap(cmap_name, 256)
     colors = list({cmap(i)[:3]: None for i in range(cmap.N)})
     if format_ == "rgb":
         pass

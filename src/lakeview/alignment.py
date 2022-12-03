@@ -386,7 +386,7 @@ class SequenceAlignment(TrackPainter):
             else:
                 segment_list = None
             # Load pileup
-            if load_pileup:
+            if load_pileup and segment_list:
                 pileup_depths = {}
                 pileup_bases = {}
                 for col in alignment_file.pileup(**region_kw):

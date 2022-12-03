@@ -51,9 +51,9 @@ class GenomeViewer:
             canvas.mpl_connect("button_press_event", lambda event: self.on_click(event))
             center_widget = canvas
         else:
-            warn(
-                f"Backend ipympl not activated. Current backend: {backend}. To enable additional interactive functionality, please activate ipympl using `%matplotlib widget`."
-            )
+            # warn(
+            #     f"Backend ipympl not activated. Current backend: {backend}. To enable additional interactive functionality, please activate ipympl using `%matplotlib widget`."
+            # )
             self.use_ipympl=False
             center_widget = ipywidgets.Output()
 
@@ -103,6 +103,12 @@ class GenomeViewer:
 
     def get_xlim(self):
         return self.axes[0].get_xlim()
+    
+    def set_xlabel(self, *args, **kw):
+        self.axes[-1].set_xlabel(*args, **kw)
+
+    def set_title(self, *args, **kw):
+        self.axes[0].set_title(*args, **kw)
 
     def savefig(self, *args, **kw):
         if self._interacted:
