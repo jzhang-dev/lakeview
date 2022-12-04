@@ -5,7 +5,21 @@ from __future__ import annotations
 import collections
 from multiprocessing.sharedctypes import Value
 
-from typing import Any, Callable, Iterable, Optional, List, Tuple, Dict, Sequence, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Optional,
+    List,
+    Tuple,
+    Dict,
+    Sequence,
+    Union,
+    Mapping,
+    Hashable,
+    TypeVar,
+    FrozenSet,
+)
 from numbers import Real
 from dataclasses import dataclass, field
 import warnings
@@ -22,6 +36,9 @@ from . import helpers, util
 # Ref skips
 # Get query sequence by position
 # Max depth marker
+
+NativeHashable = Union[int, float, str, Tuple[Hashable], FrozenSet]
+GroupIdentifier = TypeVar("GroupIdentifier", bound=NativeHashable)
 
 
 class TrackPainter:
@@ -471,13 +488,14 @@ class SequenceAlignment(TrackPainter):
     def _parse_alignment_parameters(
         self,
         *,
-        filter_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
-        group_by: Optional[Union[Callable, Iterable, str]] = None,
-        link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
-        color_by: Optional[Union[Callable, Iterable, str]] = None,
-        sort_by: Optional[Union[Callable, Iterable, str]] = None,
-        max_group_offset: Optional[Real] = float("inf"),
-        min_spacing: Optional[Real] = None,
+        filter_by,
+        group_by,
+        group_labels,  # TODO
+        link_by,
+        color_by,
+        sort_by,
+        max_group_offset,
+        min_spacing,
     ):
         segments = self.segments
         n_segments = len(segments)
@@ -508,6 +526,8 @@ class SequenceAlignment(TrackPainter):
             groups = [0] * n_segments  # Assign all segments into the same group
         elif group_by == "strand":
             group_by = lambda segment: 0 if segment.is_forward else 1
+            if group_labels is None:
+                group_labels = {0: "Forward strand", 1: "Reverse strand"}
         elif isinstance(group_by, str):
             raise ValueError()
         elif isinstance(group_by, Iterable):
@@ -516,6 +536,15 @@ class SequenceAlignment(TrackPainter):
             groups = [group_by(seg) for seg in segments]
         if len(groups) != n_segments:
             raise ValueError()
+
+        # Group labels
+        unique_groups = set(groups)
+        if group_labels is None:
+            group_labels = {g: g for g in unique_groups}
+        elif isinstance(group_labels, Callable):
+            group_labels = {g: group_labels(g) for g in unique_groups}
+        elif isinstance(group_labels, Mapping):
+            group_labels = {g: group_labels[g] for g in unique_groups}
 
         # Links
         if link_by is None:
@@ -580,7 +609,7 @@ class SequenceAlignment(TrackPainter):
             segments, colors, links, groups, offsets, by=offsets >= 0
         )
 
-        return segments, links, groups, offsets, colors
+        return segments, links, groups, offsets, colors, group_labels
 
     def _get_default_segment_height(self, ax, offsets, *, min_height=2, max_height=10):
         _, ax_height = helpers.get_ax_size(ax)
@@ -600,12 +629,39 @@ class SequenceAlignment(TrackPainter):
         self,
         ax,
         *,
-        filter_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
-        group_by: Optional[Union[Callable, Iterable, str]] = None,
-        group_labels: Optional[Union[Callable, Iterable]] = None,  # TODO
-        link_by: Optional[Union[Callable, Iterable, str]] = None,  # TODO
-        color_by: Optional[Union[Callable, Iterable, str]] = None,
-        sort_by: Optional[Union[Callable, Iterable, str]] = None,
+        filter_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
+            str,
+            None,
+        ] = None,  # TODO
+        group_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
+            str,
+            None,
+        ] = None,
+        link_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
+            str,
+            None,
+        ] = None,
+        color_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
+            str,
+            None,
+        ] = None,
+        sort_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
+            str,
+            None,
+        ] = None,
+        group_labels: Union[
+            Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
+        ] = None,  # TODO
         height=None,
         min_spacing: Optional[Real] = None,
         show_backbones=True,
@@ -622,6 +678,7 @@ class SequenceAlignment(TrackPainter):
         show_hard_clipping=True,
         min_hard_clipping_size=10,
         show_letters=False,
+        show_group_labels=True,
         show_group_separators=True,
         max_group_height=1000,
         backbones_kw={},
@@ -634,6 +691,7 @@ class SequenceAlignment(TrackPainter):
         soft_clipping_kw={},
         hard_clipping_kw={},
         letters_kw={},
+        group_labels_kw={},  # TODO
         group_separators_kw={},
     ):
         """
@@ -647,9 +705,17 @@ class SequenceAlignment(TrackPainter):
             raise ValueError("Alignment has not been loaded.")
 
         # Get runtime parameters
-        segments, links, groups, offsets, colors = self._parse_alignment_parameters(
+        (
+            segments,
+            links,
+            groups,
+            offsets,
+            colors,
+            group_labels,
+        ) = self._parse_alignment_parameters(
             filter_by=filter_by,
             group_by=group_by,
+            group_labels=group_labels,
             link_by=link_by,
             color_by=color_by,
             sort_by=sort_by,
@@ -728,6 +794,8 @@ class SequenceAlignment(TrackPainter):
             self._draw_modified_bases(
                 ax, segments, offsets, height=height, **modified_bases_kw
             )
+        if show_group_labels:
+            self._draw_group_labels(ax, groups, offsets, group_labels=group_labels, **group_labels_kw)
         if show_group_separators:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
 
@@ -741,7 +809,7 @@ class SequenceAlignment(TrackPainter):
 
     def _draw_backbones(self, ax, segments, offsets, height, *, colors, **kw):
         lines = [
-            ((seg.reference_start-0.5, y), (seg.reference_end-0.5, y))
+            ((seg.reference_start - 0.5, y), (seg.reference_end - 0.5, y))
             for seg, y in zip(segments, offsets)
         ]
         ax.add_collection(
@@ -756,9 +824,9 @@ class SequenceAlignment(TrackPainter):
 
     def _draw_arrowheads(self, ax, segments, offsets, height, *, colors, **kw):
 
-        forward_xs = [seg.reference_end-0.5 for seg in segments if seg.is_forward]
+        forward_xs = [seg.reference_end - 0.5 for seg in segments if seg.is_forward]
         forward_ys = [y for seg, y in zip(segments, offsets) if seg.is_forward]
-        reverse_xs = [seg.reference_start-0.5 for seg in segments if seg.is_reverse]
+        reverse_xs = [seg.reference_start - 0.5 for seg in segments if seg.is_reverse]
         reverse_ys = [y for seg, y in zip(segments, offsets) if seg.is_reverse]
         forward_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5), (0, 0.5)], readonly=True)
         reverse_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5), (0, 0.5)], readonly=True)
@@ -814,7 +882,9 @@ class SequenceAlignment(TrackPainter):
     ):
         xs_dict = collections.defaultdict(list)
         ys_dict = collections.defaultdict(list)
-        marker = Path([(0, 0.5), (0, -0.5)], readonly=True) # Optimally, when zoomed-in at single-base level, the mismatche marker should extend to 1-base width. For simplicity, this is not currently supported.
+        marker = Path(
+            [(0, 0.5), (0, -0.5)], readonly=True
+        )  # Optimally, when zoomed-in at single-base level, the mismatche marker should extend to 1-base width. For simplicity, this is not currently supported.
 
         for seg, y in zip(segments, offsets):
             for mb in seg.mismatched_bases:
@@ -894,7 +964,9 @@ class SequenceAlignment(TrackPainter):
         linewidth=1.5,
         **kw,
     ):
-        marker = Path([(0, 0.5), (0, -0.5)], readonly=True) # This marker prevents the deletion from being invisible when zoomed out.
+        marker = Path(
+            [(0, 0.5), (0, -0.5)], readonly=True
+        )  # This marker prevents the deletion from being invisible when zoomed out.
         lines = []
         xs = []
         ys = []
@@ -902,7 +974,10 @@ class SequenceAlignment(TrackPainter):
         for seg, y in zip(segments, offsets):
             deletions = [d for d in seg.deletions if d.size >= min_deletion_size]
             lines += [
-                ((d.reference_position-0.5, y), (d.reference_position-0.5 + d.size, y)) # The reference_position for a deletion is the first deleted base
+                (
+                    (d.reference_position - 0.5, y),
+                    (d.reference_position - 0.5 + d.size, y),
+                )  # The reference_position for a deletion is the first deleted base
                 for d in deletions
             ]
             xs += [d.reference_position + d.size / 2 for d in deletions]
@@ -982,6 +1057,24 @@ class SequenceAlignment(TrackPainter):
                     **kw,
                 )
 
+    def _draw_group_labels(
+        self, ax, groups, offsets, group_labels, *, x=0.01, size=8, horizontalalignment='left', verticalalignment='bottom', **kw
+    ):
+        max_group_offset_dict = collections.defaultdict(lambda: 0)
+        for g, y in zip(groups, offsets):
+            max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
+        for g, y in max_group_offset_dict.items():
+            ax.text(
+                x=x,
+                y=y,
+                s=group_labels[g],
+                size=size,
+                horizontalalignment=horizontalalignment, 
+                verticalalignment=verticalalignment,
+                transform=ax.get_yaxis_transform(),
+                **kw,
+            )
+
     def _draw_group_separators(
         self, ax, groups, offsets, *, linewidth=1, color="gray", linestyle="-"
     ):
@@ -1015,8 +1108,8 @@ class SequenceAlignment(TrackPainter):
 
         lines = [
             (
-                (ls.reference_start-0.5, link_offset_dict[link]),
-                (ls.reference_end-0.5, link_offset_dict[link]),
+                (ls.reference_start - 0.5, link_offset_dict[link]),
+                (ls.reference_end - 0.5, link_offset_dict[link]),
             )
             for link, ls in link_ls_dict.items()
         ]
