@@ -247,30 +247,29 @@ class GeneAnnotation:
             labels = list(label_by)
         elif isinstance(label_by, Callable):
             labels = [labels(g) for g in genes]
-        
+
         return labels, colors
-        
 
     def draw_genes(
         self,
         ax,
         *,
         allow_overlaps=False,
-        group_by= None, # TODO
-        group_labels= None, # TODO
+        group_by=None,  # TODO
+        group_labels=None,  # TODO
         color_by: Union[
-            Callable[[AnnotationRecord], Color], # TODO: define a color type
+            Callable[[AnnotationRecord], Color],  # TODO: define a color type
             Iterable[Color],
             None,
         ] = None,
-        sort_by = None, # TODO
+        sort_by=None,  # TODO
         label_by: Union[
             Callable[[AnnotationRecord], str],
             Iterable[str],
             None,
-        ] = None, # TODO: support label_by="name"
+        ] = None,  # TODO: support label_by="name"
         gene_height=None,
-        show_labels = True,
+        show_labels=True,
         labels_kw={},
     ):
         genes = self.genes
@@ -279,7 +278,9 @@ class GeneAnnotation:
             offsets = [0] * len(genes)
         else:
             offsets = helpers.pack_intervals(intervals)
-        colors, labels = self._parse_runtime_parameters(color_by=color_by, label_by=label_by)
+        colors, labels = self._parse_runtime_parameters(
+            color_by=color_by, label_by=label_by
+        )
         self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors)
         if show_labels:
             self._draw_labels(ax, genes, labels, offsets, colors=colors, **labels_kw)
@@ -324,7 +325,7 @@ class GeneAnnotation:
             y = max(offsets) + 2
         return offsets
 
-    def draw_transcripts( # TODO: mask = None for reversible subsetting
+    def draw_transcripts(  # TODO: mask = None for reversible subsetting
         self,
         ax,
         *,
@@ -448,4 +449,3 @@ class GeneAnnotation:
                 facecolors="none",
             )
         )
-

@@ -16,11 +16,10 @@ from typing import (
     Sequence,
     Union,
     Mapping,
-    Hashable,
-    TypeVar,
-    FrozenSet,
+    NoReturn,
+    Literal,
 )
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import warnings
 import functools
 import itertools
@@ -36,8 +35,6 @@ from .custom_types import *
 # Ref skips
 # Get query sequence by position
 # Max depth marker
-
-
 
 
 class TrackPainter:
@@ -58,6 +55,7 @@ class CoverageDepth(TrackPainter):
 class CigarOperation:
     reference_offset: Optional[Position]
     reference_position: Optional[Position]
+
 
 @dataclass
 class Insertion(CigarOperation):
@@ -144,22 +142,45 @@ class CIGAR:
                 found_op_match = True
             elif operation == 1:  # Insertion
                 insertions.append(
-                    Insertion(reference_position=None, reference_offset=ref_offset + 0.5, size=length)
+                    Insertion(
+                        reference_position=None,
+                        reference_offset=ref_offset + 0.5,
+                        size=length,
+                    )
                 )
             elif operation == 2:  # Deletion
-                deletions.append(Deletion(reference_position=None, reference_offset=ref_offset, size=length))
+                deletions.append(
+                    Deletion(
+                        reference_position=None,
+                        reference_offset=ref_offset,
+                        size=length,
+                    )
+                )
             elif operation == 4:  # Soft clipping
                 soft_clipping.append(
-                    SoftClippedBases(reference_position=None, size=length, reference_offset=ref_offset - 0.5)
+                    SoftClippedBases(
+                        reference_position=None,
+                        size=length,
+                        reference_offset=ref_offset - 0.5,
+                    )
                 )
             elif operation == 5:  # Hard clipping
                 hard_clipping.append(
-                    HardClippedBases(reference_position=None, size=length, reference_offset=ref_offset - 0.5)
+                    HardClippedBases(
+                        reference_position=None,
+                        size=length,
+                        reference_offset=ref_offset - 0.5,
+                    )
                 )
             elif operation == 8:  # Mismatched bases
                 mismatched_bases += [
                     MismatchedBase(
-                        reference_position=None, reference_offset=ref_offset + i, query_offset=qry_offset + i, query_position=None,  reference_base=None, query_base=None
+                        reference_position=None,
+                        reference_offset=ref_offset + i,
+                        query_offset=qry_offset + i,
+                        query_position=None,
+                        reference_base=None,
+                        query_base=None,
                     )
                     for i in range(length)
                 ]
@@ -186,7 +207,9 @@ class CIGAR:
         return cls(
             insertions=insertions,
             deletions=deletions,
-            mismatched_bases=mismatched_bases if not found_op_match else None, # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
+            mismatched_bases=mismatched_bases
+            if not found_op_match
+            else None,  # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
             soft_clipping=soft_clipping,
             hard_clipping=hard_clipping,
         )
@@ -260,7 +283,7 @@ class AlignedSegment:
                             reference_position=ref_pos,
                             query_position=qry_pos,
                             reference_base=ref_base,
-                            query_base=qry_base,   
+                            query_base=qry_base,
                             reference_offset=None,
                             query_offset=None,
                         )
@@ -300,7 +323,7 @@ class AlignedSegment:
                 modification,
             ),
             data,
-        ) in self.wrapped.modified_bases.items(): # type: ignore
+        ) in self.wrapped.modified_bases.items():  # type: ignore
             strand = {0: "+", 1: "-"}[strand]
             for pos, qual in data:
                 if qual == -1:
@@ -353,7 +376,7 @@ class LinkedSegment:
 class SequenceAlignment(TrackPainter):
     segments: List[AlignedSegment]
     pileup_depths: Optional[Dict[int, int]] = None
-    pileup_bases: Optional[Dict[int, Dict[str, int]]] = None
+    pileup_bases: Optional[Dict[int, collections.Counter[str]]] = None
     reference_name: Optional[str] = None
     reference_sequence: Optional[str] = None
 
@@ -365,19 +388,21 @@ class SequenceAlignment(TrackPainter):
     @classmethod
     def from_file(
         cls,
-        file_path,
-        mode=None,
-        reference_name=None,
-        start=None,
-        end=None,
+        file_path: str,
+        mode: Optional[
+            Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
+        ] = None,
+        reference_name: Optional[str] = None,
+        start: int = None,
+        end: int = None,
         *,
-        region=None,
-        reference_sequence=None,
-        load_alignment=True,
-        load_pileup=True,
-        check_sq=True,
+        region: Optional[str] = None,
+        reference_sequence: Optional[str] = None,
+        load_alignment: bool = True,
+        load_pileup: bool = True,
+        check_sq: bool = True,
         **alignment_file_kw,
-    ):
+    ) -> SequenceAlignment:
         if not load_alignment and not load_pileup:
             raise ValueError("`load_alignment` and `load_pileup` cannot both be False.")
         with pysam.AlignmentFile(
@@ -393,15 +418,13 @@ class SequenceAlignment(TrackPainter):
                         raise ValueError(
                             f"Reference name is not provided. Valid values: {reference_name_tuple}"
                         )
-            if any((reference_name, start, end, region)):
-                region_kw = dict(
-                    contig=reference_name, start=start, stop=end, region=region
-                )
-            else:
-                region_kw = {}
             # Load segments
             if load_alignment:
-                segment_list = list(alignment_file.fetch(**region_kw))
+                segment_list = list(
+                    alignment_file.fetch(
+                        contig=reference_name, start=start, stop=end, region=region
+                    )
+                )
                 if not segment_list:
                     warnings.warn(f"No aligned segments loaded.")
             else:
@@ -410,9 +433,13 @@ class SequenceAlignment(TrackPainter):
             if load_pileup and segment_list:
                 pileup_depths = {}
                 pileup_bases = {}
-                for col in alignment_file.pileup(**region_kw):
-                    position = col.reference_pos
-                    query_bases = [b.upper() for b in col.get_query_sequences() if b]
+                for col in alignment_file.pileup(
+                    contig=reference_name, start=start, stop=end, region=region
+                ):
+                    position: int = col.reference_pos
+                    query_bases: List[str] = [
+                        b.upper() for b in col.get_query_sequences() if b
+                    ]
                     base_counter = collections.Counter(query_bases)
                     if len(base_counter) > 1:
                         pileup_bases[position] = base_counter
@@ -437,8 +464,8 @@ class SequenceAlignment(TrackPainter):
 
     @staticmethod
     def _link_segments(
-        segments: Sequence[AlignedSegment], links: Sequence
-    ) -> Dict[Any, LinkedSegment]:
+        segments: Sequence[AlignedSegment], links: Sequence[LinkIdentifier]
+    ) -> Dict[LinkIdentifier, LinkedSegment]:
         link_seg_dict = collections.defaultdict(list)
         for seg, link in zip(segments, links):
             link_seg_dict[link].append(seg)
@@ -450,7 +477,10 @@ class SequenceAlignment(TrackPainter):
 
     @staticmethod
     def _pack_segments(
-        segments: Sequence[AlignedSegment], links: Sequence, *, padding=0
+        segments: Sequence[AlignedSegment],
+        links: Sequence[LinkIdentifier],
+        *,
+        padding: float = 0,
     ) -> np.ndarray:
         assert len(segments) == len(links)
         # Link segments
@@ -471,9 +501,15 @@ class SequenceAlignment(TrackPainter):
 
     @staticmethod
     def _get_segment_offsets(
-        segments, links, groups, *, max_group_offset, min_spacing
+        segments: Sequence[AlignedSegment],
+        links: Sequence[LinkIdentifier],
+        groups: Sequence[GroupIdentifier],
+        *,
+        max_group_offset: float,
+        min_spacing: float,
     ) -> np.ndarray:
-        assert len(segments) == len(links) == len(groups)
+        if not len(segments) == len(links) == len(groups):
+            raise ValueError
         # TODO: check no segments from differenct groups are linked together
         offsets = np.zeros(len(segments))
         y = 0
@@ -615,7 +651,9 @@ class SequenceAlignment(TrackPainter):
 
         return segments, links, groups, offsets, colors, group_labels
 
-    def _get_default_segment_height(self, ax, offsets, *, min_height=2, max_height=10):
+    def _get_default_segment_height(
+        self, ax: Axes, offsets, *, min_height=2, max_height=10
+    ) -> float:
         _, ax_height = helpers.get_ax_size(ax)
         height = max(
             min_height,
@@ -624,7 +662,7 @@ class SequenceAlignment(TrackPainter):
         height = min(height, max_height)
         return height
 
-    def _get_default_spacing(self, segments) -> float:
+    def _get_default_spacing(self, segments: Sequence[AlignedSegment]) -> float:
         segment_lengths = [seg.query_alignment_length for seg in segments]
         spacing = np.median(segment_lengths) * 0.1
         return spacing
@@ -652,7 +690,7 @@ class SequenceAlignment(TrackPainter):
             None,
         ] = None,
         color_by: Union[
-            Callable[[AlignedSegment], Color], # TODO: define a color type
+            Callable[[AlignedSegment], Color],  # TODO: define a color type
             Iterable[Color],
             str,
             None,
@@ -666,7 +704,7 @@ class SequenceAlignment(TrackPainter):
         group_labels: Union[
             Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
         ] = None,  # TODO
-        height=None,
+        height: Optional[float] = None,
         min_spacing: Optional[float] = None,
         show_backbones=True,
         show_arrowheads=True,
@@ -799,7 +837,9 @@ class SequenceAlignment(TrackPainter):
                 ax, segments, offsets, height=height, **modified_bases_kw
             )
         if show_group_labels:
-            self._draw_group_labels(ax, groups, offsets, group_labels=group_labels, **group_labels_kw)
+            self._draw_group_labels(
+                ax, groups, offsets, group_labels=group_labels, **group_labels_kw
+            )
         if show_group_separators:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
 
@@ -1062,7 +1102,17 @@ class SequenceAlignment(TrackPainter):
                 )
 
     def _draw_group_labels(
-        self, ax, groups, offsets, group_labels, *, x=0.01, size=8, horizontalalignment='left', verticalalignment='bottom', **kw
+        self,
+        ax,
+        groups,
+        offsets,
+        group_labels,
+        *,
+        x=0.01,
+        size=8,
+        horizontalalignment="left",
+        verticalalignment="bottom",
+        **kw,
     ):
         max_group_offset_dict = collections.defaultdict(lambda: 0)
         for g, y in zip(groups, offsets):
@@ -1073,7 +1123,7 @@ class SequenceAlignment(TrackPainter):
                 y=y,
                 s=group_labels[g],
                 size=size,
-                horizontalalignment=horizontalalignment, 
+                horizontalalignment=horizontalalignment,
                 verticalalignment=verticalalignment,
                 transform=ax.get_yaxis_transform(),
                 **kw,
@@ -1247,7 +1297,9 @@ class SequenceAlignment(TrackPainter):
 
     @functools.cached_property
     def _reference_bases(self) -> Dict[int, str]:
-        reference_base_dict: collections.defaultdict = collections.defaultdict(lambda: None)
+        reference_base_dict: collections.defaultdict = collections.defaultdict(
+            lambda: None
+        )
         for seg in self.segments:
             for mb in seg.mismatched_bases:
                 if (
