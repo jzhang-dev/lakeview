@@ -20,7 +20,6 @@ from typing import (
     TypeVar,
     FrozenSet,
 )
-from numbers import Real
 from dataclasses import dataclass, field
 import warnings
 import functools
@@ -31,14 +30,14 @@ from matplotlib.collections import LineCollection
 import pysam
 
 from . import helpers, util
+from .custom_types import *
 
 # TODO: label metadata
 # Ref skips
 # Get query sequence by position
 # Max depth marker
 
-NativeHashable = Union[int, float, str, Tuple[Hashable], FrozenSet]
-GroupIdentifier = TypeVar("GroupIdentifier", bound=NativeHashable)
+
 
 
 class TrackPainter:
@@ -56,55 +55,60 @@ class CoverageDepth(TrackPainter):
 
 
 @dataclass
-class Insertion:
-    reference_offset: int
+class CigarOperation:
+    reference_offset: Optional[Position]
+    reference_position: Optional[Position]
+
+@dataclass
+class Insertion(CigarOperation):
+    reference_offset: float
     size: int
-    reference_position: Optional[int] = None
+    reference_position: Optional[int]
 
 
 @dataclass
-class Deletion:
+class Deletion(CigarOperation):
     reference_offset: int
     size: int
-    reference_position: Optional[int] = None
+    reference_position: Optional[int]
 
 
 @dataclass
-class AlignedBase:
-    reference_offset: Optional[int] = None
-    query_offset: Optional[int] = None
-    reference_position: Optional[int] = None
-    query_position: Optional[int] = None
-    reference_base: Optional[str] = None
-    query_base: Optional[str] = None
+class AlignedBase(CigarOperation):
+    reference_offset: Optional[int]
+    query_offset: Optional[int]
+    reference_position: Optional[int]
+    query_position: Optional[int]
+    reference_base: Optional[str]
+    query_base: Optional[str]
     depth: int = 1
 
 
 @dataclass
-class ModifiedBase:
+class ModifiedBase(CigarOperation):
     reference_position: int
     canonical_base: str
     modification: str
     strand: str
-    probability: Optional[float] = None
+    probability: Optional[float]
 
 
 @dataclass
-class MismatchedBase:
-    reference_offset: Optional[int] = None
-    query_offset: Optional[int] = None
-    reference_position: Optional[int] = None
-    query_position: Optional[int] = None
-    reference_base: Optional[str] = None
-    query_base: Optional[str] = None
+class MismatchedBase(CigarOperation):
+    reference_offset: Optional[int]
+    query_offset: Optional[int]
+    reference_position: Optional[int]
+    query_position: Optional[int]
+    reference_base: Optional[str]
+    query_base: Optional[str]
     depth: int = 1
 
 
 @dataclass
-class ClippedBases:
-    reference_offset: int
+class ClippedBases(CigarOperation):
+    reference_offset: float
     size: int
-    reference_position: Optional[int] = None
+    reference_position: Optional[int]
 
 
 class SoftClippedBases(ClippedBases):
@@ -140,22 +144,22 @@ class CIGAR:
                 found_op_match = True
             elif operation == 1:  # Insertion
                 insertions.append(
-                    Insertion(reference_offset=ref_offset + 0.5, size=length)
+                    Insertion(reference_position=None, reference_offset=ref_offset + 0.5, size=length)
                 )
             elif operation == 2:  # Deletion
-                deletions.append(Deletion(reference_offset=ref_offset, size=length))
+                deletions.append(Deletion(reference_position=None, reference_offset=ref_offset, size=length))
             elif operation == 4:  # Soft clipping
                 soft_clipping.append(
-                    SoftClippedBases(size=length, reference_offset=ref_offset - 0.5)
+                    SoftClippedBases(reference_position=None, size=length, reference_offset=ref_offset - 0.5)
                 )
             elif operation == 5:  # Hard clipping
                 hard_clipping.append(
-                    HardClippedBases(size=length, reference_offset=ref_offset - 0.5)
+                    HardClippedBases(reference_position=None, size=length, reference_offset=ref_offset - 0.5)
                 )
             elif operation == 8:  # Mismatched bases
                 mismatched_bases += [
                     MismatchedBase(
-                        reference_offset=ref_offset + i, query_offset=qry_offset + i
+                        reference_position=None, reference_offset=ref_offset + i, query_offset=qry_offset + i, query_position=None,  reference_base=None, query_base=None
                     )
                     for i in range(length)
                 ]
@@ -168,9 +172,6 @@ class CIGAR:
             if operation == 9:
                 # TODO: check Operation 9 (BAM_CBACK)
                 raise ValueError(f"operation={operation}")
-            if found_op_match:
-                # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
-                mismatched_bases = None
 
         if reference_start is not None:
             for x in itertools.chain(
@@ -185,7 +186,7 @@ class CIGAR:
         return cls(
             insertions=insertions,
             deletions=deletions,
-            mismatched_bases=mismatched_bases,
+            mismatched_bases=mismatched_bases if not found_op_match else None, # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
             soft_clipping=soft_clipping,
             hard_clipping=hard_clipping,
         )
@@ -201,7 +202,7 @@ class AlignedSegment:
         return getattr(self.wrapped, name)
 
     @functools.cached_property
-    def reference_position_dict(self):
+    def reference_position_dict(self) -> Dict[int, Optional[int]]:
         return {
             qry_pos: ref_pos
             for qry_pos, ref_pos in self.get_aligned_pairs()
@@ -259,7 +260,9 @@ class AlignedSegment:
                             reference_position=ref_pos,
                             query_position=qry_pos,
                             reference_base=ref_base,
-                            query_base=qry_base,
+                            query_base=qry_base,   
+                            reference_offset=None,
+                            query_offset=None,
                         )
                     )
         elif self.alignment and self.alignment.reference_sequence:
@@ -297,7 +300,7 @@ class AlignedSegment:
                 modification,
             ),
             data,
-        ) in self.wrapped.modified_bases.items():
+        ) in self.wrapped.modified_bases.items(): # type: ignore
             strand = {0: "+", 1: "-"}[strand]
             for pos, qual in data:
                 if qual == -1:
@@ -308,7 +311,8 @@ class AlignedSegment:
                 if reference_position is not None:
                     modified_bases.append(
                         ModifiedBase(
-                            reference_position=self.get_aligned_reference_position(pos),
+                            reference_position=reference_position,
+                            reference_offset=None,
                             canonical_base=canonical_base,
                             modification=modification,
                             strand=strand,
@@ -349,7 +353,7 @@ class LinkedSegment:
 class SequenceAlignment(TrackPainter):
     segments: List[AlignedSegment]
     pileup_depths: Optional[Dict[int, int]] = None
-    pileup_bases: Optional[Dict[int, Dict[str:int]]] = None
+    pileup_bases: Optional[Dict[int, Dict[str, int]]] = None
     reference_name: Optional[str] = None
     reference_sequence: Optional[str] = None
 
@@ -447,7 +451,7 @@ class SequenceAlignment(TrackPainter):
     @staticmethod
     def _pack_segments(
         segments: Sequence[AlignedSegment], links: Sequence, *, padding=0
-    ) -> np.array:
+    ) -> np.ndarray:
         assert len(segments) == len(links)
         # Link segments
         link_ls_dict = SequenceAlignment._link_segments(segments, links)
@@ -468,7 +472,7 @@ class SequenceAlignment(TrackPainter):
     @staticmethod
     def _get_segment_offsets(
         segments, links, groups, *, max_group_offset, min_spacing
-    ) -> List[int]:
+    ) -> np.ndarray:
         assert len(segments) == len(links) == len(groups)
         # TODO: check no segments from differenct groups are linked together
         offsets = np.zeros(len(segments))
@@ -485,7 +489,7 @@ class SequenceAlignment(TrackPainter):
             y = max(offsets) + 2
         return offsets
 
-    def _parse_alignment_parameters(
+    def _parse_runtime_parameters(
         self,
         *,
         filter_by,
@@ -620,7 +624,7 @@ class SequenceAlignment(TrackPainter):
         height = min(height, max_height)
         return height
 
-    def _get_default_spacing(self, segments) -> Real:
+    def _get_default_spacing(self, segments) -> float:
         segment_lengths = [seg.query_alignment_length for seg in segments]
         spacing = np.median(segment_lengths) * 0.1
         return spacing
@@ -630,26 +634,26 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         filter_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
+            Callable[[AlignedSegment], bool],
+            Iterable[bool],
             str,
             None,
         ] = None,  # TODO
         group_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
+            Callable[[AlignedSegment], GroupIdentifier],
+            Iterable[GroupIdentifier],
             str,
             None,
         ] = None,
         link_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
+            Callable[[AlignedSegment], LinkIdentifier],
+            Iterable[LinkIdentifier],
             str,
             None,
         ] = None,
         color_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
+            Callable[[AlignedSegment], Color], # TODO: define a color type
+            Iterable[Color],
             str,
             None,
         ] = None,
@@ -663,7 +667,7 @@ class SequenceAlignment(TrackPainter):
             Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
         ] = None,  # TODO
         height=None,
-        min_spacing: Optional[Real] = None,
+        min_spacing: Optional[float] = None,
         show_backbones=True,
         show_arrowheads=True,
         show_links=True,
@@ -712,7 +716,7 @@ class SequenceAlignment(TrackPainter):
             offsets,
             colors,
             group_labels,
-        ) = self._parse_alignment_parameters(
+        ) = self._parse_runtime_parameters(
             filter_by=filter_by,
             group_by=group_by,
             group_labels=group_labels,
@@ -1241,63 +1245,9 @@ class SequenceAlignment(TrackPainter):
                 ls="",
             )
 
-    def _draw_pileup_mismatches(
-        self,
-        ax,
-        *,
-        min_alt_frequency,
-        min_alt_depth,
-        linewidth=1.5,
-        palette={
-            "A": "tab:green",
-            "T": "tab:red",
-            "C": "tab:blue",
-            "G": "tab:brown",
-        },
-    ):
-
-        mismatch_positions = set()
-        for position, base_counter in self.pileup_bases.items():
-            reference_base = self._reference_bases[position]
-            total_depth = self.pileup_depths[position]
-            if reference_base is None:
-                raise ValueError(
-                    "Reference sequence is required for drawing pileup mismatches."
-                )
-            for base, depth in base_counter.items():
-                if (
-                    base != reference_base
-                    and depth >= min_alt_depth
-                    and depth / total_depth >= min_alt_frequency
-                ):
-                    mismatch_positions.add(position)
-                    break
-        mismatch_positions = np.array(sorted(mismatch_positions), dtype=int)
-
-        bottom = np.zeros(mismatch_positions.shape)
-        for base, color in palette.items():
-            counts = np.array(
-                [self.pileup_bases[p][base] for p in mismatch_positions], dtype=int
-            )
-            nonzero = counts > 0
-            xs = mismatch_positions[nonzero]
-            ys = counts[nonzero]
-            bs = bottom[nonzero]
-
-            ax.bar(
-                xs,
-                ys,
-                width=1,
-                linewidth=linewidth,
-                facecolor=color,
-                edgecolor=color,
-                bottom=bs,
-            )
-            bottom += counts
-
     @functools.cached_property
     def _reference_bases(self) -> Dict[int, str]:
-        reference_base_dict = collections.defaultdict(lambda: None)
+        reference_base_dict: collections.defaultdict = collections.defaultdict(lambda: None)
         for seg in self.segments:
             for mb in seg.mismatched_bases:
                 if (

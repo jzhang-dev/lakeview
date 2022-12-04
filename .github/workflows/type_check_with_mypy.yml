@@ -1,0 +1,18 @@
+name: mypy
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v3
+    - name: Install with pip
+      run: |
+        pip install -v .
+    - name: Test with pytest
+      run: |
+        pip install mypy
+        mypy src/lakeview/*.py

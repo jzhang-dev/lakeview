@@ -146,7 +146,7 @@ def download_bam(
         pysam.index(output_bam_path, output_bai_path)
 
 
-def pack_intervals(intervals: Iterable[Tuple[Real, Real]]) -> List[Real]:
+def pack_intervals(intervals: Iterable[Tuple[float, float]]) -> List[int]:
     """
     Assign an non-negative offset to each input interval so that intervals sharing the same offset will not overlap with each other, while minimising offset values.
     Intervals are treated as being closed.
@@ -154,7 +154,7 @@ def pack_intervals(intervals: Iterable[Tuple[Real, Real]]) -> List[Real]:
     >>> pack_intervals([(1, 2), (3, 4), (1, 3), (0, 5)])
     [0, 0, 1, 2]
     """
-    occupied_intervals: List[List[Tuple[Real, Real]]] = [[]]
+    occupied_intervals: List[List[Tuple[float, float]]] = [[]]
     offsets = []
     for (start, end) in intervals:
         for offset, intervals in enumerate(occupied_intervals):

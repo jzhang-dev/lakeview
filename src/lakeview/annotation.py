@@ -8,8 +8,7 @@ import numpy as np
 from matplotlib.collections import LineCollection
 
 from . import helpers
-
-
+from .custom_types import *
 
 
 @dataclass
@@ -100,7 +99,7 @@ class GeneAnnotation:
         else:
             raise ValueError("Only GTF and GFF3 formats are supported.")
 
-        records = []
+        records: List[AnnotationRecord] = []
         for line in file_object:
             if line.startswith("#"):
                 continue
@@ -227,17 +226,51 @@ class GeneAnnotation:
                 raise ValueError("Failed to automatically detect `transcript_key`.")
         return transcript_key
 
+    def _parse_runtime_parameters(
+        self,
+        *,
+        color_by,
+        label_by,
+    ):
+        genes = self.genes
+        # Colors
+        if color_by is None:
+            colors = ["b"] * len(genes)
+        elif isinstance(color_by, Iterable):
+            colors = list(color_by)
+        elif isinstance(color_by, Callable):
+            colors = [color_by(g) for g in genes]
+        # Labels
+        if label_by == None:
+            labels = [""] * len(genes)
+        elif isinstance(label_by, Iterable):
+            labels = list(label_by)
+        elif isinstance(label_by, Callable):
+            labels = [labels(g) for g in genes]
+        
+        return labels, colors
+        
+
     def draw_genes(
         self,
         ax,
         *,
         allow_overlaps=False,
-        groups: Optional[Union[Callable, Iterable]] = None,
-        group_labels: Optional[Union[Callable, Iterable]] = None,
-        colors: Optional[Union[Callable, Iterable]] = None,
-        order: Optional[Union[Callable, Iterable]] = None,
-        labels: Optional[Union[Callable, Iterable]] = None,
+        group_by= None, # TODO
+        group_labels= None, # TODO
+        color_by: Union[
+            Callable[[AnnotationRecord], Color], # TODO: define a color type
+            Iterable[Color],
+            None,
+        ] = None,
+        sort_by = None, # TODO
+        label_by: Union[
+            Callable[[AnnotationRecord], str],
+            Iterable[str],
+            None,
+        ] = None, # TODO: support label_by="name"
         gene_height=None,
+        show_labels = True,
         labels_kw={},
     ):
         genes = self.genes
@@ -246,12 +279,9 @@ class GeneAnnotation:
             offsets = [0] * len(genes)
         else:
             offsets = helpers.pack_intervals(intervals)
-        if colors is None:
-            colors = ["b"] * len(genes)
-        if isinstance(labels, Callable):
-            labels = [labels(g) for g in genes]
+        colors, labels = self._parse_runtime_parameters(color_by=color_by, label_by=label_by)
         self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors)
-        if labels:
+        if show_labels:
             self._draw_labels(ax, genes, labels, offsets, colors=colors, **labels_kw)
         ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
         ax.set_ylabel("")
@@ -277,12 +307,12 @@ class GeneAnnotation:
                 )
 
     @staticmethod
-    def _pack_transcripts(transcripts: Sequence[AnnotationRecord]) -> np.array:
+    def _pack_transcripts(transcripts: Sequence[AnnotationRecord]) -> np.ndarray:
         intervals = [(t.start, t.end) for t in transcripts]
         return np.array(helpers.pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
-    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> List[int]:
+    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> np.ndarray:
         offsets = np.zeros(len(transcripts))
         y = 0
         for group in list(sorted(set(groups))):
