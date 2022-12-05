@@ -193,8 +193,8 @@ def get_ax_size(ax):
 
 def scientific_notation(x: float, significant_figures: int = 3, *, quote: str = "$") -> str:
     """
-    >>> get_scientific_notation(0.000000013923, 4)
-    '$1.392×10^{-8}$'
+    >>> scientific_notation(0.000000013923, 4)
+    '$1.392\\times 10^{-8}$'
     """
     if significant_figures < 1:
         raise ValueError()
@@ -206,5 +206,5 @@ def scientific_notation(x: float, significant_figures: int = 3, *, quote: str = 
     # Remove leading zeros
     exponent = str(int(exponent))
     # Format with mathtext
-    s = quote + f"{coefficient}×10^" + "{" + exponent + "}" + quote
+    s = quote + coefficient + r"\times 10^" + "{" + exponent + "}" + quote
     return s
