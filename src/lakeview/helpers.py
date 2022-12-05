@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 from typing import Tuple, Iterable, List
 import os
 import tempfile
@@ -186,3 +189,22 @@ def get_ax_size(ax):
     bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     width, height = bbox.width, bbox.height
     return (width, height)
+
+
+def scientific_notation(x: float, significant_figures: int = 3, *, quote: str = "$") -> str:
+    """
+    >>> get_scientific_notation(0.000000013923, 4)
+    '$1.392×10^{-8}$'
+    """
+    if significant_figures < 1:
+        raise ValueError()
+    if not isinstance(significant_figures, int):
+        raise ValueError()
+    float_digits = significant_figures - 1
+    # Python native scientific notation
+    coefficient, exponent = format(x, f".{float_digits}e").split("e")
+    # Remove leading zeros
+    exponent = str(int(exponent))
+    # Format with mathtext
+    s = quote + f"{coefficient}×10^" + "{" + exponent + "}" + quote
+    return s

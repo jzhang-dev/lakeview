@@ -393,8 +393,8 @@ class SequenceAlignment(TrackPainter):
             Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
         ] = None,
         reference_name: Optional[str] = None,
-        start: int = None,
-        end: int = None,
+        start: Optional[int] = None,
+        end: Optional[int] = None,
         *,
         region: Optional[str] = None,
         reference_sequence: Optional[str] = None,
