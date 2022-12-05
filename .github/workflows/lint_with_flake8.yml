@@ -3,7 +3,7 @@ name: Lint with Flake8
 on: [push]
 
 jobs:
-  build-linux:
+  Flake8:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3

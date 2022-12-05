@@ -3,7 +3,7 @@ name: pytest
 on: [push]
 
 jobs:
-  build-linux:
+  pytest:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
