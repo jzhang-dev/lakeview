@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import collections, random, math, itertools, functools
+import collections
+import random
+import math
+import itertools
 from dataclasses import dataclass
 from typing import Optional, List
 import numpy as np

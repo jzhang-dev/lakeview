@@ -1,4 +1,11 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# coding: utf-8
 
-from .core import *
+__author__ = "Jia-Yuan Zhang"
+__email__ = "jzhang@well.ox.ac.uk"
+
+from .alignment import AlignedSegment, SequenceAlignment
+from .annotation import GeneAnnotation
+from .sequences import DotPlot
+from .widget import GenomeViewer
 from . import util, helpers

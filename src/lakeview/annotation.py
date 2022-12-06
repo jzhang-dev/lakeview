@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib.collections import LineCollection
 
 from . import helpers
-from .custom_types import *
+from .custom_types import Color, Axes
 
 
 @dataclass
@@ -252,7 +252,7 @@ class GeneAnnotation:
 
     def draw_genes(
         self,
-        ax,
+        ax: Axes,
         *,
         allow_overlaps=False,
         group_by=None,  # TODO

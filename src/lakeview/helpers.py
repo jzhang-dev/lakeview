@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from typing import Tuple, Iterable, List
+from typing import Tuple, Iterable, List, Literal
 import os
 import tempfile
 from numbers import Real
@@ -10,7 +10,7 @@ from matplotlib.colors import rgb2hex
 import pysam
 
 
-def get_cmap_colors(cmap_name, format_="hex"):
+def get_cmap_colors(cmap_name: str, format_: Literal["hex", "rgb"] = "hex"):
     """
     https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
 
@@ -208,3 +208,4 @@ def scientific_notation(x: float, significant_figures: int = 3, *, quote: str = 
     # Format with mathtext
     s = quote + coefficient + r"\times 10^" + "{" + exponent + "}" + quote
     return s
+    

@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 import collections
-from multiprocessing.sharedctypes import Value
 
 from typing import (
-    Any,
     Callable,
     Iterable,
     Optional,
@@ -16,7 +14,6 @@ from typing import (
     Sequence,
     Union,
     Mapping,
-    NoReturn,
     Literal,
 )
 from dataclasses import dataclass
@@ -28,8 +25,15 @@ from matplotlib.path import Path
 from matplotlib.collections import LineCollection
 import pysam
 
-from . import helpers, util
-from .custom_types import *
+from . import helpers
+from .custom_types import (
+    NativeHashable,
+    GroupIdentifier,
+    LinkIdentifier,
+    Color,
+    Position,
+    Axes,
+)
 
 # TODO: label metadata
 # Ref skips
@@ -426,7 +430,7 @@ class SequenceAlignment(TrackPainter):
                     )
                 )
                 if not segment_list:
-                    warnings.warn(f"No aligned segments loaded.")
+                    warnings.warn("No aligned segments loaded.")
             else:
                 segment_list = None
             # Load pileup
@@ -741,7 +745,6 @@ class SequenceAlignment(TrackPainter):
         Linked reads are ordered by first read in the link.
         """
         segments = self.segments
-        n_segments = len(segments)
 
         if segments is None:
             raise ValueError("Alignment has not been loaded.")

@@ -2,9 +2,6 @@
 # coding: utf-8
 
 from warnings import warn
-from dataclasses import dataclass, field
-from numbers import Real
-from typing import List, Dict, Optional, Tuple, Callable
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from IPython.display import display
@@ -35,7 +32,7 @@ class GenomeViewer:
             constrained_layout=True
         )
         self.figure = fig
-        #self.blit_manager = _BlitManager(fig.canvas)
+        # self.blit_manager = _BlitManager(fig.canvas)
         self.axes = list(axes[:, 0])
         self._init_app()
 
