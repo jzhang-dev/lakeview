@@ -54,7 +54,6 @@ def test_IGH():
     CHROMOSOME = "chr14"
     START = 104586347
     END = 107043718
-    REGION = f"{CHROMOSOME}:{START}-{END}"
     GENCODE_GTF_PATH = "data/gencode.v40.annotation.gtf.gz"
     PACBIO_BAM_PATH = "data/HG002_IGH_PacBio_CCS.bam"
     OUTPUT_PNG_PATH = "output/IGH_PacBio_Gencode.png"

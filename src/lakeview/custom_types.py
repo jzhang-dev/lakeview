@@ -2,8 +2,8 @@ from typing import Tuple, Hashable, FrozenSet, Union, TypeVar
 from matplotlib import axes
 
 NativeHashable = Union[int, float, str, Tuple[Hashable], FrozenSet]
-GroupIdentifier = TypeVar("GroupIdentifier", bound=NativeHashable)
-LinkIdentifier = TypeVar("LinkIdentifier", bound=NativeHashable)
-Color = TypeVar("Color", bound=NativeHashable)  # TODO: more specific color type
+GroupIdentifier = NativeHashable
+LinkIdentifier = NativeHashable
+Color = Union[Tuple[float, float, float], Tuple[float, float, float, float], str]
 Position = Union[int, float]
 Axes = axes.Axes

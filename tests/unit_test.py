@@ -21,3 +21,7 @@ def test_load_bam():
         )
     assert len(p.segments) == 0
 
+
+def test_filter_segments():
+    pass
+

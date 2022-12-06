@@ -532,15 +532,49 @@ class SequenceAlignment(TrackPainter):
     def _parse_runtime_parameters(
         self,
         *,
-        filter_by,
-        group_by,
-        group_labels,  # TODO
-        link_by,
-        color_by,
-        sort_by,
-        max_group_offset,
-        min_spacing,
-    ):
+        sort_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
+            str,
+            None,
+        ],
+        link_by: Union[
+            Callable[[AlignedSegment], LinkIdentifier],
+            Iterable[LinkIdentifier],
+            str,
+            None,
+        ],
+        group_by: Union[
+            Callable[[AlignedSegment], GroupIdentifier],
+            Iterable[GroupIdentifier],
+            str,
+            None,
+        ],
+        filter_by: Union[
+            Callable[[AlignedSegment], bool],
+            Iterable[bool],
+            str,
+            None,
+        ],
+        color_by: Union[
+            Callable[[AlignedSegment], Color],  # TODO: define a color type
+            Iterable[Color],
+            str,
+            None,
+        ],
+        group_labels: Union[
+            Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
+        ],
+        max_group_offset: float,
+        min_spacing: float,
+    ) -> Tuple[
+        List[AlignedSegment],
+        List[LinkIdentifier],
+        List[GroupIdentifier],
+        np.ndarray,
+        List[Color],
+        Dict[GroupIdentifier, str],
+    ]:
         segments = self.segments
         n_segments = len(segments)
 
@@ -548,96 +582,106 @@ class SequenceAlignment(TrackPainter):
             raise ValueError("Alignment has not been loaded.")
 
         # Colors
+        colors: List[Color] = []
         if color_by is None:
             colors = ["lightgray"] * n_segments
         elif color_by == "random":
-            color_by = lambda segment: "lightgray"  # TODO: random colors
+            colors = ["lightgray"] * n_segments  # TODO: random colors
         elif color_by == "strand":
-            color_by = (
-                lambda segment: "lightgray" if segment.is_forward else "darkgray"
+            colors = list(
+                map(
+                    lambda segment: "lightgray" if segment.is_forward else "darkgray",
+                    segments,
+                )
             )  # TODO: better colors
         elif isinstance(color_by, str):
             raise ValueError()
         elif isinstance(color_by, Iterable):
             colors = list(color_by)
-        if isinstance(color_by, Callable):
+            if len(colors) != n_segments:
+                raise ValueError()
+        elif callable(color_by):
             colors = [color_by(seg) for seg in segments]
-        if len(colors) != n_segments:
-            raise ValueError()
-
+        
         # Groups
+        groups: List[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_segments  # Assign all segments into the same group
         elif group_by == "strand":
-            group_by = lambda segment: 0 if segment.is_forward else 1
+            groups = list(map(lambda segment: 0 if segment.is_forward else 1, segments))
             if group_labels is None:
                 group_labels = {0: "Forward strand", 1: "Reverse strand"}
         elif isinstance(group_by, str):
             raise ValueError()
         elif isinstance(group_by, Iterable):
             groups = list(group_by)
-        if isinstance(group_by, Callable):
+            if len(groups) != n_segments:
+                raise ValueError()
+        if callable(group_by):
             groups = [group_by(seg) for seg in segments]
-        if len(groups) != n_segments:
-            raise ValueError()
-
+        
         # Group labels
         unique_groups = set(groups)
         if group_labels is None:
-            group_labels = {g: g for g in unique_groups}
-        elif isinstance(group_labels, Callable):
+            group_labels = {g: str(g) for g in unique_groups}
+        elif callable(group_labels):
             group_labels = {g: group_labels(g) for g in unique_groups}
         elif isinstance(group_labels, Mapping):
             group_labels = {g: group_labels[g] for g in unique_groups}
 
         # Links
+        links: List[LinkIdentifier] = []
         if link_by is None:
             links = list(range(n_segments))  # Do not link segments together
         elif link_by == "pair":
-            pass  # TODO
+            links = list(range(n_segments))  # TODO
         elif link_by == "name":
-            link_by = lambda seg: seg.query_name
+            links = [seg.query_name for seg in segments]
         elif isinstance(link_by, str):
             raise ValueError()
         elif isinstance(link_by, Iterable):
             links = list(link_by)
-        if isinstance(link_by, Callable):
+            if len(links) != n_segments:
+                raise ValueError()
+        elif callable(link_by):
             links = [link_by(seg) for seg in segments]
 
         # Filter segments
-        if filter_by is None:
-            selection = [True] * n_segments  # No filtering
-        elif filter_by == "no_secondary":
-            filter_by = lambda seg: not seg.is_secondary
+        selection: List[bool] = []
+        if filter_by == "no_secondary":
+            selection = [not seg.is_secondary for seg in segments]
         elif isinstance(filter_by, str):
             raise ValueError()
         elif isinstance(filter_by, Iterable):
-            selection = list(filter_by)
-        if isinstance(filter_by, Callable):
+            selection = list(filter_by) # type: ignore
+            if len(selection) != n_segments:
+                raise ValueError()
+        elif callable(filter_by):
             selection = [filter_by(seg) for seg in segments]
-        # TODO: implement filtering
+        if filter_by is not None:
+            segments, colors, links, groups = helpers.filter_by(
+                segments, colors, links, groups, by=selection
+            )
+            if not segments:
+                warnings.warn("All segments removed after filtering.")
 
         # Sort segments
         if sort_by == "start":
-            sort_by = lambda seg: seg.reference_start
+            keys = [seg.reference_start for seg in segments]
         elif sort_by == "length":
-            sort_by = lambda seg: seg.query_alignment_length
+            keys = [seg.query_alignment_length for seg in segments]
         elif isinstance(sort_by, str):
             raise ValueError()
         elif isinstance(sort_by, Iterable):
             keys = list(sort_by)
-        if isinstance(sort_by, Callable):
+            if len(keys) != n_segments:
+                raise ValueError()
+        elif callable(sort_by):
             keys = [sort_by(seg) for seg in segments]
         if sort_by is not None:
-            if keys is not None and len(keys) != n_segments:
-                raise ValueError()
             segments, colors, links, groups = helpers.sort_by(
                 segments, colors, links, groups, by=keys
             )
-
-        # Get default spacing
-        if min_spacing is None:
-            min_spacing = self._get_default_spacing(segments)
 
         # Get segment offsets
         offsets = self._get_segment_offsets(
@@ -675,15 +719,9 @@ class SequenceAlignment(TrackPainter):
         self,
         ax,
         *,
-        filter_by: Union[
-            Callable[[AlignedSegment], bool],
-            Iterable[bool],
-            str,
-            None,
-        ] = None,  # TODO
-        group_by: Union[
-            Callable[[AlignedSegment], GroupIdentifier],
-            Iterable[GroupIdentifier],
+        sort_by: Union[
+            Callable[[AlignedSegment], NativeHashable],
+            Iterable[NativeHashable],
             str,
             None,
         ] = None,
@@ -693,21 +731,27 @@ class SequenceAlignment(TrackPainter):
             str,
             None,
         ] = None,
+        group_by: Union[
+            Callable[[AlignedSegment], GroupIdentifier],
+            Iterable[GroupIdentifier],
+            str,
+            None,
+        ] = None,
+        filter_by: Union[
+            Callable[[AlignedSegment], bool],
+            Iterable[bool],
+            str,
+            None,
+        ] = None,
         color_by: Union[
             Callable[[AlignedSegment], Color],  # TODO: define a color type
             Iterable[Color],
             str,
             None,
         ] = None,
-        sort_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
-            str,
-            None,
-        ] = None,
         group_labels: Union[
             Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
-        ] = None,  # TODO
+        ] = None,
         height: Optional[float] = None,
         min_spacing: Optional[float] = None,
         show_backbones=True,
@@ -748,6 +792,10 @@ class SequenceAlignment(TrackPainter):
 
         if segments is None:
             raise ValueError("Alignment has not been loaded.")
+
+        # Get default spacing
+        if min_spacing is None:
+            min_spacing = self._get_default_spacing(segments)
 
         # Get runtime parameters
         (
