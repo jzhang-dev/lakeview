@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from typing import Tuple, Iterable, List, Literal
+from typing import Tuple, Iterable, List, Literal, Callable, Any ,Collection
 import os
 import tempfile
 from numbers import Real
 import matplotlib as mpl
 from matplotlib.colors import rgb2hex
 import pysam
+from .custom_types import Color, NativeHashable
 
 
-def get_cmap_colors(cmap_name: str, format_: Literal["hex", "rgb"] = "hex"):
+def get_cmap_colors(
+    cmap_name: str, format_: Literal["hex", "rgb"] = "hex"
+) -> List[Color]:
     """
     https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
 
@@ -35,7 +38,9 @@ def get_cmap_colors(cmap_name: str, format_: Literal["hex", "rgb"] = "hex"):
     return colors
 
 
-def sort_by(*iterables, by, reverse=False):
+def sort_by(
+    *iterables: Collection, by: Collection[NativeHashable], reverse: bool = False
+) -> List[List]:
     """
     Sort multiple equal-length lists by the value of another list.
 
@@ -60,7 +65,7 @@ def sort_by(*iterables, by, reverse=False):
     return sorted_lists
 
 
-def filter_by(*iterables, by):
+def filter_by(*iterables: Collection, by: Collection[bool]) -> List[List]:
     """
     Filter multiple equal-length lists by the value of another list.
 
@@ -191,7 +196,9 @@ def get_ax_size(ax):
     return (width, height)
 
 
-def scientific_notation(x: float, significant_figures: int = 3, *, quote: str = "$") -> str:
+def scientific_notation(
+    x: float, significant_figures: int = 3, *, quote: str = "$"
+) -> str:
     """
     >>> scientific_notation(0.000000013923, 4)
     '$1.392\\times 10^{-8}$'
@@ -208,4 +215,3 @@ def scientific_notation(x: float, significant_figures: int = 3, *, quote: str = 
     # Format with mathtext
     s = quote + coefficient + r"\times 10^" + "{" + exponent + "}" + quote
     return s
-    

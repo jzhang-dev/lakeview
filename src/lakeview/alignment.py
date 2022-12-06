@@ -15,6 +15,7 @@ from typing import (
     Union,
     Mapping,
     Literal,
+    Collection,
 )
 from dataclasses import dataclass
 import warnings
@@ -33,6 +34,7 @@ from .custom_types import (
     Color,
     Position,
     Axes,
+    Base,
 )
 
 # TODO: label metadata
@@ -265,9 +267,9 @@ class AlignedSegment:
         return self.cigar.hard_clipping
 
     @functools.cached_property
-    def mismatched_bases(self):
+    def mismatched_bases(self) -> Optional[List[MismatchedBase]]:
         query_sequence = self.query_sequence
-        mismatched_bases = self.cigar.mismatched_bases
+        mismatched_bases: Optional[List[MismatchedBase]] = self.cigar.mismatched_bases
         if mismatched_bases is not None:
             # Use CIGAR mismatches if available
             for m in mismatched_bases:
@@ -296,6 +298,7 @@ class AlignedSegment:
             # MD tag not present.
             # Fall back to checking user-supplied reference sequence.
             reference_sequence = self.alignment.reference_sequence
+            mismatched_bases = []
             for qry_pos, ref_pos in self.get_aligned_pairs(
                 matches_only=True, with_seq=False
             ):
@@ -308,13 +311,13 @@ class AlignedSegment:
                             query_position=qry_pos,
                             reference_base=ref_base,
                             query_base=qry_base,
+                            reference_offset=None,
+                            query_offset=None,
                         )
                     )
         else:
-            # All methods failed. Notify the user.
-            raise RuntimeError(
-                "Failed to obtain mismatched bases using CIGAR string or the MD tag. Please provide the reference sequence."
-            )
+            # All methods failed.
+            mismatched_bases = None
         return mismatched_bases
 
     @functools.cached_property
@@ -354,26 +357,12 @@ class LinkedSegment:
     segments: List[AlignedSegment]
 
     @property
-    def reference_start(self):
+    def reference_start(self) -> int:
         return min(seg.reference_start for seg in self.segments)
 
     @property
-    def reference_end(self):
+    def reference_end(self) -> int:
         return max(seg.reference_end for seg in self.segments)
-
-    # def __getattr__(self, name):
-    #     if name in (
-    #         "insertions",
-    #         "deletions",
-    #         "soft_clipping",
-    #         "hard_clipping",
-    #         "mismatched_bases",
-    #         "modified_bases",
-    #     ):
-    #         seg_attr_list = [get_attr(seg, name) for seg in self.segments]
-    #         return list(itertools.chain(*seg_attr_list))
-    #     else:
-    #         return super().__getattr__(self, name)
 
 
 @dataclass(repr=False)
@@ -602,7 +591,7 @@ class SequenceAlignment(TrackPainter):
             groups = [0] * n_segments  # Assign all segments into the same group
         elif group_by == "strand":
             groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
-        elif group_by == 'proper_pair':
+        elif group_by == "proper_pair":
             groups = [seg.is_proper_pair for seg in segments]
         elif isinstance(group_by, str):
             raise ValueError()
@@ -650,6 +639,7 @@ class SequenceAlignment(TrackPainter):
                 warnings.warn("All segments removed after filtering.")
 
         # Sort segments
+        keys: List[NativeHashable] = []
         if sort_by == "start":
             keys = [seg.reference_start for seg in segments]
         elif sort_by == "length":
@@ -777,7 +767,7 @@ class SequenceAlignment(TrackPainter):
         )
 
         # Get segment offsets
-        offsets = self._get_segment_offsets(
+        offset_array = self._get_segment_offsets(
             segments,
             links,
             groups,
@@ -787,7 +777,7 @@ class SequenceAlignment(TrackPainter):
 
         # Remove segments exceeding `max_group_offset`
         segments, links, groups, offsets, colors = helpers.filter_by(
-            segments, links, groups, offsets, colors, by=offsets >= 0
+            segments, links, groups, offset_array, colors, by=offset_array >= 0
         )
 
         # Get segment height
@@ -799,7 +789,10 @@ class SequenceAlignment(TrackPainter):
         group_label_dict: Dict[GroupIdentifier, str] = {}
         if group_labels is None:
             if group_by == "strand":
-                group_label_dict = {0: "Forward strand", 1: "Reverse strand"}
+                group_label_dict = {
+                    "forward": "Forward strand",
+                    "reverse": "Reverse strand",
+                }
             else:
                 group_label_dict = {g: str(g) for g in unique_groups}
         elif callable(group_labels):
@@ -969,6 +962,10 @@ class SequenceAlignment(TrackPainter):
         )  # Optimally, when zoomed-in at single-base level, the mismatche marker should extend to 1-base width. For simplicity, this is not currently supported.
 
         for seg, y in zip(segments, offsets):
+            if seg.mismatched_bases is None:
+                raise RuntimeError(
+                    "Failed to obtain mismatched bases using CIGAR string or the MD tag. Please provide the reference sequence or use `show_mismatched_bases=False`."
+                )
             for mb in seg.mismatched_bases:
                 xs_dict[mb.query_base].append(mb.reference_position)
                 ys_dict[mb.query_base].append(y)
@@ -1336,29 +1333,30 @@ class SequenceAlignment(TrackPainter):
             )
 
     @functools.cached_property
-    def _reference_bases(self) -> Dict[int, str]:
+    def _reference_bases(self) -> Dict[int, Optional[str]]:
         reference_base_dict: collections.defaultdict = collections.defaultdict(
             lambda: None
         )
         for seg in self.segments:
-            for mb in seg.mismatched_bases:
-                if (
-                    mb.reference_base is not None
-                    and mb.reference_position not in reference_base_dict
-                ):
-                    reference_base_dict[
-                        mb.reference_position
-                    ] = mb.reference_base.upper()
+            if seg.mismatched_bases is not None:
+                for mb in seg.mismatched_bases:
+                    if (
+                        mb.reference_base is not None
+                        and mb.reference_position not in reference_base_dict
+                    ):
+                        reference_base_dict[
+                            mb.reference_position
+                        ] = mb.reference_base.upper()
         return reference_base_dict
 
     def draw_pileup(
         self,
-        ax,
+        ax: Axes,
         *,
-        color="lightgray",
-        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
-        min_alt_frequency=0.2,
-        min_alt_depth=2,
+        color: Color = "lightgray",
+        show_mismatches: bool = True,  # TODO: show_mismatches=None -> draw if available
+        min_alt_frequency: float = 0.2,
+        min_alt_depth: float = 2,
         mismatch_kw={},
         **kw,
     ):
@@ -1378,20 +1376,21 @@ class SequenceAlignment(TrackPainter):
 
     def _draw_pileup_mismatches(
         self,
-        ax,
+        ax: Axes,
         *,
-        min_alt_frequency,
-        min_alt_depth,
-        linewidth=1.5,
-        palette={
+        min_alt_frequency: float,
+        min_alt_depth: float,
+        linewidth: float = 1.5,
+        palette: Dict[Base, Color] = {
             "A": "tab:green",
             "T": "tab:red",
             "C": "tab:blue",
             "G": "tab:brown",
         },
     ):
-
         mismatch_positions = set()
+        if self.pileup_bases is None or self.pileup_depths is None:
+            raise ValueError("Pileup has not been loaded.")
         for position, base_counter in self.pileup_bases.items():
             reference_base = self._reference_bases[position]
             total_depth = self.pileup_depths[position]
@@ -1407,15 +1406,15 @@ class SequenceAlignment(TrackPainter):
                 ):
                     mismatch_positions.add(position)
                     break
-        mismatch_positions = np.array(sorted(mismatch_positions), dtype=int)
+        mismatch_position_array = np.array(sorted(mismatch_positions), dtype=int)
 
-        bottom = np.zeros(mismatch_positions.shape)
+        bottom = np.zeros(mismatch_position_array.shape)
         for base, color in palette.items():
             counts = np.array(
-                [self.pileup_bases[p][base] for p in mismatch_positions], dtype=int
+                [self.pileup_bases[p][base] for p in mismatch_position_array], dtype=int
             )
             nonzero = counts > 0
-            xs = mismatch_positions[nonzero]
+            xs = mismatch_position_array[nonzero]
             ys = counts[nonzero]
             bs = bottom[nonzero]
 

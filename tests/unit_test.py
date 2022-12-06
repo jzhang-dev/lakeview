@@ -3,6 +3,9 @@ import pytest
 import lakeview as lv
 
 
+# TODO: load user supplied reference sequence.
+
+
 def test_load_bam():
     p = lv.SequenceAlignment.from_file("tests/data/SKBR3_Illumina_550bp_pcrFREE.bam")
     assert len(p.segments) == 1800
