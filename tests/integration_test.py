@@ -5,9 +5,9 @@ import lakeview as lv
 
 
 def test_SKBR3():
-    ILLUMINA_BAM_PATH = "data/SKBR3_Illumina_550bp_pcrFREE.bam"
-    PACBIO_BAM_PATH = "data/SKBR3_PacBio.bam"
-    OUTPUT_PNG_PATH = "output/SKBR3_Illumina_PacBio.png"
+    ILLUMINA_BAM_PATH = "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam"
+    PACBIO_BAM_PATH = "tests/data/SKBR3_PacBio.bam"
+    OUTPUT_PNG_PATH = "tests/output/SKBR3_Illumina_PacBio.png"
     illumina_painter = lv.SequenceAlignment.from_file(ILLUMINA_BAM_PATH, "rb")
     pacbio_painter = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, "rb")
 
@@ -32,8 +32,8 @@ def test_SKBR3():
 
 
 def test_GNAS_WES():
-    EXON_BAM_PATH = "data/HG002_GNAS_Illumina_WES.bam"
-    OUTPUT_SVG_PATH = "output/GNAS_WES.svg"
+    EXON_BAM_PATH = "tests/data/HG002_GNAS_Illumina_WES.bam"
+    OUTPUT_SVG_PATH = "tests/output/GNAS_WES.svg"
     painter = lv.SequenceAlignment.from_file(EXON_BAM_PATH, "rb")
     painter.segments = [seg for i, seg in enumerate(painter.segments) if i % 20 == 0]
     assert len(painter.segments) == 754
@@ -54,9 +54,9 @@ def test_IGH():
     CHROMOSOME = "chr14"
     START = 104586347
     END = 107043718
-    GENCODE_GTF_PATH = "data/gencode.v40.annotation.gtf.gz"
-    PACBIO_BAM_PATH = "data/HG002_IGH_PacBio_CCS.bam"
-    OUTPUT_PNG_PATH = "output/IGH_PacBio_Gencode.png"
+    GENCODE_GTF_PATH = "tests/data/gencode.v40.annotation.gtf.gz"
+    PACBIO_BAM_PATH = "tests/data/HG002_IGH_PacBio_CCS.bam"
+    OUTPUT_PNG_PATH = "tests/output/IGH_PacBio_Gencode.png"
 
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
         gencode_painter = lv.GeneAnnotation.from_file(
@@ -92,8 +92,8 @@ def test_IGH():
 
 
 def test_dot_plot():
-    IGH_FASTA_PATH = "data/IGH_reference_sequences.fasta.gz"
-    OUTPUT_PNG_PATH = "output/IGH_dot_plot.png"
+    IGH_FASTA_PATH = "tests/data/IGH_reference_sequences.fasta.gz"
+    OUTPUT_PNG_PATH = "tests/output/IGH_dot_plot.png"
 
     with gzip.open(IGH_FASTA_PATH, 'rt') as f1, gzip.open(IGH_FASTA_PATH, 'rt') as f2:
         painter = lv.DotPlot.from_files(

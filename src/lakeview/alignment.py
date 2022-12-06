@@ -529,7 +529,7 @@ class SequenceAlignment(TrackPainter):
             y = max(offsets) + 2
         return offsets
 
-    def _parse_runtime_parameters(
+    def _parse_segment_parameters(
         self,
         *,
         sort_by: Union[
@@ -562,18 +562,11 @@ class SequenceAlignment(TrackPainter):
             str,
             None,
         ],
-        group_labels: Union[
-            Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
-        ],
-        max_group_offset: float,
-        min_spacing: float,
     ) -> Tuple[
         List[AlignedSegment],
         List[LinkIdentifier],
         List[GroupIdentifier],
-        np.ndarray,
         List[Color],
-        Dict[GroupIdentifier, str],
     ]:
         segments = self.segments
         n_segments = len(segments)
@@ -602,15 +595,15 @@ class SequenceAlignment(TrackPainter):
                 raise ValueError()
         elif callable(color_by):
             colors = [color_by(seg) for seg in segments]
-        
+
         # Groups
         groups: List[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_segments  # Assign all segments into the same group
         elif group_by == "strand":
-            groups = list(map(lambda segment: 0 if segment.is_forward else 1, segments))
-            if group_labels is None:
-                group_labels = {0: "Forward strand", 1: "Reverse strand"}
+            groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
+        elif group_by == 'proper_pair':
+            groups = [seg.is_proper_pair for seg in segments]
         elif isinstance(group_by, str):
             raise ValueError()
         elif isinstance(group_by, Iterable):
@@ -619,15 +612,6 @@ class SequenceAlignment(TrackPainter):
                 raise ValueError()
         if callable(group_by):
             groups = [group_by(seg) for seg in segments]
-        
-        # Group labels
-        unique_groups = set(groups)
-        if group_labels is None:
-            group_labels = {g: str(g) for g in unique_groups}
-        elif callable(group_labels):
-            group_labels = {g: group_labels(g) for g in unique_groups}
-        elif isinstance(group_labels, Mapping):
-            group_labels = {g: group_labels[g] for g in unique_groups}
 
         # Links
         links: List[LinkIdentifier] = []
@@ -653,7 +637,7 @@ class SequenceAlignment(TrackPainter):
         elif isinstance(filter_by, str):
             raise ValueError()
         elif isinstance(filter_by, Iterable):
-            selection = list(filter_by) # type: ignore
+            selection = list(filter_by)  # type: ignore
             if len(selection) != n_segments:
                 raise ValueError()
         elif callable(filter_by):
@@ -669,7 +653,7 @@ class SequenceAlignment(TrackPainter):
         if sort_by == "start":
             keys = [seg.reference_start for seg in segments]
         elif sort_by == "length":
-            keys = [seg.query_alignment_length for seg in segments]
+            keys = [-seg.query_alignment_length for seg in segments]
         elif isinstance(sort_by, str):
             raise ValueError()
         elif isinstance(sort_by, Iterable):
@@ -683,21 +667,7 @@ class SequenceAlignment(TrackPainter):
                 segments, colors, links, groups, by=keys
             )
 
-        # Get segment offsets
-        offsets = self._get_segment_offsets(
-            segments,
-            links,
-            groups,
-            max_group_offset=max_group_offset,
-            min_spacing=min_spacing,
-        )
-
-        # Remove segments exceeding `max_group_offset`
-        segments, colors, links, groups, offsets = helpers.filter_by(
-            segments, colors, links, groups, offsets, by=offsets >= 0
-        )
-
-        return segments, links, groups, offsets, colors, group_labels
+        return segments, links, groups, colors
 
     def _get_default_segment_height(
         self, ax: Axes, offsets, *, min_height=2, max_height=10
@@ -797,28 +767,45 @@ class SequenceAlignment(TrackPainter):
         if min_spacing is None:
             min_spacing = self._get_default_spacing(segments)
 
-        # Get runtime parameters
-        (
-            segments,
-            links,
-            groups,
-            offsets,
-            colors,
-            group_labels,
-        ) = self._parse_runtime_parameters(
+        # Parse segment parameters
+        segments, links, groups, colors = self._parse_segment_parameters(
             filter_by=filter_by,
             group_by=group_by,
-            group_labels=group_labels,
             link_by=link_by,
             color_by=color_by,
             sort_by=sort_by,
-            max_group_offset=max_group_height - 1,
+        )
+
+        # Get segment offsets
+        offsets = self._get_segment_offsets(
+            segments,
+            links,
+            groups,
+            max_group_offset=max_group_height,
             min_spacing=min_spacing,
+        )
+
+        # Remove segments exceeding `max_group_offset`
+        segments, links, groups, offsets, colors = helpers.filter_by(
+            segments, links, groups, offsets, colors, by=offsets >= 0
         )
 
         # Get segment height
         if height is None:
             height = self._get_default_segment_height(ax, offsets)
+
+        # Parse group labels
+        unique_groups = set(groups)
+        group_label_dict: Dict[GroupIdentifier, str] = {}
+        if group_labels is None:
+            if group_by == "strand":
+                group_label_dict = {0: "Forward strand", 1: "Reverse strand"}
+            else:
+                group_label_dict = {g: str(g) for g in unique_groups}
+        elif callable(group_labels):
+            group_label_dict = {g: group_labels(g) for g in unique_groups}
+        elif isinstance(group_labels, Mapping):
+            group_label_dict = {g: group_labels[g] for g in unique_groups}
 
         # Draw components
         if show_backbones:
@@ -889,7 +876,7 @@ class SequenceAlignment(TrackPainter):
             )
         if show_group_labels:
             self._draw_group_labels(
-                ax, groups, offsets, group_labels=group_labels, **group_labels_kw
+                ax, groups, offsets, group_labels=group_label_dict, **group_labels_kw
             )
         if show_group_separators:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
@@ -1154,10 +1141,10 @@ class SequenceAlignment(TrackPainter):
 
     def _draw_group_labels(
         self,
-        ax,
+        ax: Axes,
         groups,
         offsets,
-        group_labels,
+        group_labels: Dict[GroupIdentifier, str],
         *,
         x=0.01,
         size=8,
@@ -1165,7 +1152,9 @@ class SequenceAlignment(TrackPainter):
         verticalalignment="bottom",
         **kw,
     ):
-        max_group_offset_dict = collections.defaultdict(lambda: 0)
+        max_group_offset_dict: Dict[GroupIdentifier, int] = collections.defaultdict(
+            lambda: 0
+        )
         for g, y in zip(groups, offsets):
             max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
         for g, y in max_group_offset_dict.items():
