@@ -25,7 +25,8 @@ def test_SKBR3():
     gv.set_xlim(64040802, 64045633)
     gv.axes[1].set_ylabel("Illumina")
     gv.axes[3].set_ylabel("PacBio")
-    gv.set_xlabel("chr17")  # TODO: add x formatter
+    gv.set_xlabel("chr17")
+    gv.axes[-1].xaxis.set_major_formatter(lv.util.base_formatter(unit="mb", fmt="{:.3f}"))
     gv.set_title("SKBR3")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 200e3
@@ -91,22 +92,44 @@ def test_IGH():
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
 
 
+def test_SNURF_methylation():
+    PACBIO_BAM_PATH = "tests/data/HG002_GRCh38_SNURF_haplotagged.bam"
+    OUTPUT_PNG_PATH = "tests/output/SNURF_methylation.png"
+    p = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, "rb")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    p.draw_alignment(
+        ax,
+        group_by="haplotype",
+        show_modified_bases=True,
+        modified_bases_kw=dict(
+            linewidth=1.5,
+            colormaps={("C", "m", "+"): "cividis", ("C", "m", "-"): "cividis"},
+        ),
+    )
+    ax.set_title("$\it{SNURF}$ differentially methylated region")
+    ax.set_xlim(24.953e6, 24.958e6)
+    ax.set_xlabel("chr15 (Mb)")
+    ax.xaxis.set_major_formatter(lv.util.base_formatter(unit="mb", fmt="{:.3f}"))
+    fig.savefig(OUTPUT_PNG_PATH, dpi=300)
+    assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
+
+
 def test_dot_plot():
     IGH_FASTA_PATH = "tests/data/IGH_reference_sequences.fasta.gz"
     OUTPUT_PNG_PATH = "tests/output/IGH_dot_plot.png"
 
-    with gzip.open(IGH_FASTA_PATH, 'rt') as f1, gzip.open(IGH_FASTA_PATH, 'rt') as f2:
+    with gzip.open(IGH_FASTA_PATH, "rt") as f1, gzip.open(IGH_FASTA_PATH, "rt") as f2:
         painter = lv.DotPlot.from_files(
             f1,
             f2,
             x_sequence_name="NC_000014.9:c106879844-105586437",
             y_sequence_name="NT_187600.1:c1351393-54793",
-            sample_fraction=0.2
+            sample_fraction=0.2,
         )
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     painter.draw_dots(axes[0])
-    painter.draw_heatmap(axes[1], bin_size=10e3, cmin=0) # TODO: add a microsatellite region to demonstrate StainedGlass-style plot
+    painter.draw_heatmap(
+        axes[1], bin_size=10e3, cmin=0
+    )  # TODO: add a microsatellite region to demonstrate StainedGlass-style plot
     fig.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
-
-

@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from typing import Tuple, Iterable, List, Literal, Callable, Any ,Collection
+from typing import Tuple, Iterable, List, Literal, Callable, Any ,Collection, Optional
 import os
+import pathlib
 import tempfile
 from numbers import Real
 import matplotlib as mpl
@@ -126,32 +127,38 @@ def draw_rigid_polygon(
     ax.add_patch(polygon)
 
 
+def make_parent_dir():
+    pass
+
+
 def download_bam(
-    bam_url,
-    bai_url,
-    region,
-    output_bam_path,
-    output_bai_path=None,
+    bam_url:str,
+    bai_url:str,
+    region:str,
+    output_bam_path:str,
+    output_bai_path:Optional[str]=None,
     *,
-    index=True,
-    override=False,
+    index:bool=True,
+    override:bool=False,
 ):
     if not os.path.isfile(output_bam_path) or override:
         workdir = os.getcwd()
         with tempfile.TemporaryDirectory() as d:
             try:
                 os.chdir(d)
-                bam_data = pysam.view("-X", "-b", bam_url, bai_url, region)
+                bam_data = pysam.view("-X", "-b", bam_url, bai_url, region) # type: ignore
             finally:
                 os.chdir(workdir)
-        os.makedirs(os.path.split(output_bam_path)[0], exist_ok=True)
+        target_dir = os.path.split(output_bam_path)[0]
+        pathlib.Path(target_dir).mkdir( parents=True, exist_ok=True )
         with open(output_bam_path, "wb") as f:
             f.write(bam_data)
     if output_bai_path is None:
         output_bai_path = output_bam_path + ".bai"
     if index and (not os.path.isfile(output_bai_path) or override):
-        os.makedirs(os.path.split(output_bai_path)[0], exist_ok=True)
-        pysam.index(output_bam_path, output_bai_path)
+        target_dir = os.path.split(output_bai_path)[0]
+        pathlib.Path(target_dir).mkdir( parents=True, exist_ok=True )
+        pysam.index(output_bam_path, output_bai_path) # type: ignore
 
 
 def pack_intervals(intervals: Iterable[Tuple[float, float]]) -> List[int]:

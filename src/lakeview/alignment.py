@@ -22,6 +22,7 @@ import warnings
 import functools
 import itertools
 import numpy as np
+import matplotlib as mpl
 from matplotlib.path import Path
 from matplotlib.collections import LineCollection
 import pysam
@@ -536,7 +537,7 @@ class SequenceAlignment(TrackPainter):
         group_by: Union[
             Callable[[AlignedSegment], GroupIdentifier],
             Iterable[GroupIdentifier],
-            str,
+            Literal["haplotype", "proper_pair", "strand"],
             None,
         ],
         filter_by: Union[
@@ -589,10 +590,15 @@ class SequenceAlignment(TrackPainter):
         groups: List[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_segments  # Assign all segments into the same group
-        elif group_by == "strand":
-            groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
+        elif group_by == "haplotype":
+            groups = [
+                seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
+                for seg in segments
+            ]
         elif group_by == "proper_pair":
             groups = [seg.is_proper_pair for seg in segments]
+        elif group_by == "strand":
+            groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
         elif isinstance(group_by, str):
             raise ValueError()
         elif isinstance(group_by, Iterable):
@@ -694,7 +700,7 @@ class SequenceAlignment(TrackPainter):
         group_by: Union[
             Callable[[AlignedSegment], GroupIdentifier],
             Iterable[GroupIdentifier],
-            str,
+            Literal["haplotype", "proper_pair", "strand"],
             None,
         ] = None,
         filter_by: Union[
@@ -728,7 +734,7 @@ class SequenceAlignment(TrackPainter):
         show_hard_clipping=True,
         min_hard_clipping_size=10,
         show_letters=False,
-        show_group_labels=True,
+        show_group_labels: Optional[bool] = None,
         show_group_separators=True,
         max_group_height=1000,
         backbones_kw={},
@@ -793,12 +799,19 @@ class SequenceAlignment(TrackPainter):
                     "forward": "Forward strand",
                     "reverse": "Reverse strand",
                 }
+            elif group_by == "haplotype":
+                group_label_dict = {hp: f"Haplotype {hp}" for hp in groups}
+                group_label_dict[float("inf")] = "Haplotype unknown"
             else:
                 group_label_dict = {g: str(g) for g in unique_groups}
         elif callable(group_labels):
             group_label_dict = {g: group_labels(g) for g in unique_groups}
         elif isinstance(group_labels, Mapping):
             group_label_dict = {g: group_labels[g] for g in unique_groups}
+
+        # Group labels
+        if show_group_labels is None and group_label_dict is not None:
+            show_group_labels = True
 
         # Draw components
         if show_backbones:
@@ -1100,7 +1113,9 @@ class SequenceAlignment(TrackPainter):
         offsets,
         height,
         *,
-        colormaps={("C", "m", "+"): "Reds", ("C", "m", "-"): "Reds"},
+        colormaps: Dict[
+            Tuple[Base, str, Literal["+", "-"]], Union[str, mpl.colors.Colormap]
+        ] = {("C", "m", "+"): "Reds", ("C", "m", "-"): "Reds"},
         linewidth=1,
         zorder=3,
         **kw,
@@ -1143,7 +1158,8 @@ class SequenceAlignment(TrackPainter):
         offsets,
         group_labels: Dict[GroupIdentifier, str],
         *,
-        x=0.01,
+        dx=0.01,  # Axes unit
+        dy=0.5,  # Data unit
         size=8,
         horizontalalignment="left",
         verticalalignment="bottom",
@@ -1156,8 +1172,8 @@ class SequenceAlignment(TrackPainter):
             max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
         for g, y in max_group_offset_dict.items():
             ax.text(
-                x=x,
-                y=y,
+                x=dx,
+                y=y + dy,
                 s=group_labels[g],
                 size=size,
                 horizontalalignment=horizontalalignment,
