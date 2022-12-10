@@ -434,10 +434,10 @@ class SequenceAlignment(TrackPainter):
                     query_bases: List[str] = [
                         b.upper() for b in col.get_query_sequences() if b
                     ]
+                    pileup_depths[position] = len(query_bases) # col.nsegments includes reference skips; use len(query_bases) instead
                     base_counter = collections.Counter(query_bases)
                     if len(base_counter) > 1:
                         pileup_bases[position] = base_counter
-                    pileup_depths[position] = col.nsegments
                 # If a position has no coverage, there will be no columns corresponding to that position.
                 # Need to manually add zeros to the pileup_depths for correct plotting
                 sorted_pileup_depths = {}
