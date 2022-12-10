@@ -63,6 +63,13 @@ class CigarOperation:
     reference_offset: Optional[Position]
     reference_position: Optional[Position]
 
+@dataclass
+class AlignmentMatch(CigarOperation):
+    reference_offset: Position
+    size: int
+    reference_position: Optional[Position]
+    
+
 
 @dataclass
 class Insertion(CigarOperation):
@@ -76,17 +83,6 @@ class Deletion(CigarOperation):
     reference_offset: int
     size: int
     reference_position: Optional[int]
-
-
-@dataclass
-class AlignedBase(CigarOperation):
-    reference_offset: Optional[int]
-    query_offset: Optional[int]
-    reference_position: Optional[int]
-    query_position: Optional[int]
-    reference_base: Optional[str]
-    query_base: Optional[str]
-    depth: int = 1
 
 
 @dataclass
@@ -126,6 +122,7 @@ class HardClippedBases(ClippedBases):
 
 @dataclass
 class CIGAR:
+    alignment_matches: List[Tuple[int, int]]
     insertions: List[Insertion]
     deletions: List[Deletion]
     soft_clipping: List[SoftClippedBases]
@@ -136,6 +133,7 @@ class CIGAR:
     def from_cigartuples(
         cls, cigartuples: List[Tuple[str, int]], *, reference_start=None
     ):
+        alignment_matches = []
         insertions = []
         deletions = []
         soft_clipping = []
@@ -191,6 +189,8 @@ class CIGAR:
                     )
                     for i in range(length)
                 ]
+            if operation in (0, 7, 8): # Alignment matches
+                alignment_matches.append(AlignmentMatch(reference_offset=ref_offset, size=length, reference_position=None))
             if operation in (0, 2, 3, 7, 8):
                 # Only these operations 'consume reference'
                 ref_offset += length
@@ -212,6 +212,7 @@ class CIGAR:
                 x.reference_position = reference_start + x.reference_offset
 
         return cls(
+            alignment_matches=alignment_matches,
             insertions=insertions,
             deletions=deletions,
             mismatched_bases=mismatched_bases
@@ -250,6 +251,13 @@ class AlignedSegment:
         return CIGAR.from_cigartuples(
             self.cigartuples, reference_start=self.reference_start
         )
+
+    @property
+    def alignment_match_intervals(self) -> List[Tuple[Position, Position]]: # TODO
+        intervals: List[Tuple[int, int]] = []
+        for m in self.cigar.alignment_matches:
+            pass
+        return intervals
 
     @property
     def insertions(self):
@@ -434,7 +442,9 @@ class SequenceAlignment(TrackPainter):
                     query_bases: List[str] = [
                         b.upper() for b in col.get_query_sequences() if b
                     ]
-                    pileup_depths[position] = len(query_bases) # col.nsegments includes reference skips; use len(query_bases) instead
+                    pileup_depths[position] = len(
+                        query_bases
+                    )  # col.nsegments includes reference skips; use len(query_bases) instead
                     base_counter = collections.Counter(query_bases)
                     if len(base_counter) > 1:
                         pileup_bases[position] = base_counter
@@ -876,11 +886,15 @@ class SequenceAlignment(TrackPainter):
             self._draw_modified_bases(
                 ax, segments, offsets, height=height, **modified_bases_kw
             )
-        if show_group_labels is True or (show_group_labels is None and group_by is not None):
+        if show_group_labels is True or (
+            show_group_labels is None and group_by is not None
+        ):
             self._draw_group_labels(
                 ax, groups, offsets, group_labels=group_label_dict, **group_labels_kw
             )
-        if show_group_separators is True or (show_group_separators is None and group_by is not None):
+        if show_group_separators is True or (
+            show_group_separators is None and group_by is not None
+        ):
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
 
         # Set axis limits
@@ -1040,6 +1054,23 @@ class SequenceAlignment(TrackPainter):
             **kw,
         )
 
+    @functools.cached_property
+    def _deletion_marker(self):
+        # This marker prevents the deletion from being invisible when zoomed out.
+        # The 'size' of the marker appears to be automatically normalized to the farest point from the origin.
+        # Two placeholder points (-1, 0) and (1, 0) are added to make the marker 'look larger' before scaling
+        marker = Path(
+            [(-1, 0), (-0.1, 0), (0.1, 0), (1, 0)],
+            [
+                Path.MOVETO,
+                Path.MOVETO,
+                Path.LINETO,
+                Path.MOVETO,
+            ], 
+            readonly=True,
+        )
+        return marker
+
     def _draw_deletions(
         self,
         ax,
@@ -1048,17 +1079,13 @@ class SequenceAlignment(TrackPainter):
         height,
         *,
         min_deletion_size,
-        color="w",
+        color="k",
         linewidth=1.5,
         **kw,
     ):
-        marker = Path(
-            [(0, 0.5), (0, -0.5)], readonly=True
-        )  # This marker prevents the deletion from being invisible when zoomed out.
         lines = []
         xs = []
         ys = []
-
         for seg, y in zip(segments, offsets):
             deletions = [d for d in seg.deletions if d.size >= min_deletion_size]
             lines += [
@@ -1071,33 +1098,26 @@ class SequenceAlignment(TrackPainter):
             xs += [d.reference_position + d.size / 2 for d in deletions]
             ys += [y] * len(deletions)
 
-        ax.add_collection(
-            LineCollection(
-                lines,
-                linewidths=height,
-                colors=color,
-                zorder=1,
-                facecolors="none",
-            )
-        )
+        # Marker
         ax.plot(
             xs,
             ys,
-            marker=marker,
+            marker=self._deletion_marker,
             markersize=height,
             markeredgecolor=color,
             markerfacecolor="none",
             ls="",
             linewidth=linewidth,
-            zorder=1.1,
+            zorder=1.2,
             **kw,
         )
+        # Black line
         ax.add_collection(
             LineCollection(
                 lines,
                 linewidths=1,
                 colors="k",
-                zorder=1.2,
+                zorder=1.1,
                 facecolors="none",
             )
         )
