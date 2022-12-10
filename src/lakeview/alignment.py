@@ -735,7 +735,7 @@ class SequenceAlignment(TrackPainter):
         min_hard_clipping_size=10,
         show_letters=False,
         show_group_labels: Optional[bool] = None,
-        show_group_separators=True,
+        show_group_separators=None,
         max_group_height=1000,
         backbones_kw={},
         arrowheads_kw={},
@@ -809,10 +809,6 @@ class SequenceAlignment(TrackPainter):
         elif isinstance(group_labels, Mapping):
             group_label_dict = {g: group_labels[g] for g in unique_groups}
 
-        # Group labels
-        if show_group_labels is None and group_label_dict is not None:
-            show_group_labels = True
-
         # Draw components
         if show_backbones:
             self._draw_backbones(
@@ -880,11 +876,11 @@ class SequenceAlignment(TrackPainter):
             self._draw_modified_bases(
                 ax, segments, offsets, height=height, **modified_bases_kw
             )
-        if show_group_labels:
+        if show_group_labels is True or (show_group_labels is None and group_by is not None):
             self._draw_group_labels(
                 ax, groups, offsets, group_labels=group_label_dict, **group_labels_kw
             )
-        if show_group_separators:
+        if show_group_separators is True or (show_group_separators is None and group_by is not None):
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
 
         # Set axis limits
