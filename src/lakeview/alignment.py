@@ -375,7 +375,7 @@ class AlignedSegment:
                 )
         return mismatched_bases
 
-    @property
+    @functools.cached_property
     def mismatched_bases(self) -> List[MismatchedBase]:
         if self.cigar.mismatched_bases:
             mismatched_bases = self.cigar.mismatched_bases
