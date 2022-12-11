@@ -194,17 +194,13 @@ class CIGAR:
             elif operation == 3:  # Reference skip
                 reference_skips.append(
                     ReferenceSkip(
-                        segment=segment,
-                        reference_offset=ref_offset,
-                        size=length
+                        segment=segment, reference_offset=ref_offset, size=length
                     )
                 )
             elif operation == 4:  # Soft clipping
                 soft_clipping.append(
                     SoftClippedBases(
-                        segment=segment,
-                        reference_offset=ref_offset,
-                        size=length
+                        segment=segment, reference_offset=ref_offset, size=length
                     )
                 )
             elif operation == 5:  # Hard clipping
@@ -254,25 +250,57 @@ class CIGAR:
 
 
 @dataclass
-class MDMismachedBase: # TODO
+class MdMismatchedBase:  # TODO
     reference_position: int
-    canonical_base: str
-    modification: str
-    strand: str
-    probability: Optional[float] = None
+    query_position: int
+    reference_base: int
+    query_base: int
+
 
 # A wrapper around pysam.AlignedSegment
 @dataclass(init=False)
 class AlignedSegment:
     wrapped: pysam.AlignedSegment
+    reference_start: int
+    reference_end: int
 
     def __init__(self, wrapped: pysam.AlignedSegment):
         self.wrapped = wrapped
+        if wrapped.reference_start is None or wrapped.reference_end is None:
+            raise ValueError()
+        self.reference_start = wrapped.reference_start
+        self.reference_end = wrapped.reference_end
+        if wrapped.query_name is None:
+            raise ValueError()
+        self.query_name: str = wrapped.query_name
+        self.is_forward: bool = wrapped.is_forward  # type: ignore
+        self.is_reverse: bool = not self.is_forward
+        self.is_proper_pair: bool = wrapped.is_proper_pair
+        self.is_secondary: bool = wrapped.is_secondary
+        self.query_alignment_length: int = wrapped.query_alignment_length
+
         if self.cigartuples is not None:
             self.cigar = CIGAR.from_aligned_segment(self)
 
-    def __getattr__(self, name):
-        return getattr(self.wrapped, name)
+    # def __getattr__(self, name):
+    #     return getattr(self.wrapped, name)
+
+    def has_tag(self, tag: str):
+        return self.wrapped.has_tag(tag)
+
+    def get_tag(self, tag: str):
+        return self.wrapped.get_tag(tag)
+
+    @property
+    def cigartuples(self):
+        return self.wrapped.cigartuples
+
+    @functools.cached_property
+    def query_sequence(self):
+        return self.wrapped.query_sequence
+
+    def get_aligned_pairs(self, *args, **kw):
+        return self.wrapped.get_aligned_pairs(*args, **kw)
 
     @functools.cached_property
     def reference_sequence(self) -> str:
@@ -329,9 +357,33 @@ class AlignedSegment:
     def hard_clipping(self):
         return self.cigar.hard_clipping
 
+    def _get_md_mismatched_bases(self) -> List[MdMismatchedBase]:
+        query_sequence = self.query_sequence
+        mismatched_bases = []
+        for qry_pos, ref_pos, ref_base in self.get_aligned_pairs(
+            matches_only=True, with_seq=True
+        ):
+            qry_base = query_sequence[qry_pos]
+            if qry_base != ref_base:
+                mismatched_bases.append(
+                    MdMismatchedBase(
+                        reference_position=ref_pos,
+                        query_position=qry_pos,
+                        reference_base=ref_base,
+                        query_base=qry_base,
+                    )
+                )
+        return mismatched_bases
+
     @property
     def mismatched_bases(self) -> List[MismatchedBase]:
-        return self.cigar.mismatched_bases
+        if self.cigar.mismatched_bases:
+            mismatched_bases = self.cigar.mismatched_bases
+        elif self.has_tag("MD"):
+            mismatched_bases = self._get_md_mismatched_bases()
+        else:
+            mismatched_bases = []
+        return mismatched_bases
 
     @functools.cached_property
     def modified_bases(self) -> List[ModifiedBase]:
@@ -390,7 +442,7 @@ class SequenceAlignment(TrackPainter):
     reference_sequence: Optional[str] = None
 
     def __post_init__(self):
-        self.segments = [seg for seg in self.segments if seg.is_mapped]
+        self.segments = [seg for seg in self.segments if seg.wrapped.is_mapped]
         for segment in self.segments:
             segment.alignment = self
 
@@ -429,11 +481,13 @@ class SequenceAlignment(TrackPainter):
                         )
             # Load segments
             if load_alignment:
-                segment_list = list(
-                    alignment_file.fetch(
+                segment_list = [
+                    seg
+                    for seg in alignment_file.fetch(
                         contig=reference_name, start=start, stop=end, region=region
                     )
-                )
+                    if seg.reference_start is not None and seg.reference_end is not None
+                ]
                 if not segment_list:
                     warnings.warn("No aligned segments loaded.")
             else:
@@ -695,7 +749,7 @@ class SequenceAlignment(TrackPainter):
 
     def _get_default_spacing(self, segments: Sequence[AlignedSegment]) -> float:
         segment_lengths = [seg.query_alignment_length for seg in segments]
-        spacing = np.median(segment_lengths) * 0.1
+        spacing = float(np.median(segment_lengths) * 0.1)
         return spacing
 
     def draw_alignment(
@@ -1301,9 +1355,9 @@ class SequenceAlignment(TrackPainter):
         fwd_head_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True)
         rev_head_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True)
 
-        xs_dict = collections.defaultdict(list)
-        ys_dict = collections.defaultdict(list)
-
+        # Group clipping by type
+        xs_dict: Dict[str, List[float]] = collections.defaultdict(list)
+        ys_dict: Dict[str, List[float]] = collections.defaultdict(list)
         for seg, y in zip(segments, offsets):
             for clip in seg.soft_clipping:
                 if clip.size >= min_soft_clipping_size:
@@ -1319,8 +1373,7 @@ class SequenceAlignment(TrackPainter):
                             clip_type = "fwd_head"
                         else:
                             clip_type = "rev_tail"
-
-                    xs_dict[clip_type].append(clip.reference_position)
+                    xs_dict[clip_type].append(clip.reference_position - 0.5)
                     ys_dict[clip_type].append(y)
         for clip_type in set(xs_dict):
             xs = xs_dict[clip_type]
@@ -1360,9 +1413,9 @@ class SequenceAlignment(TrackPainter):
         fwd_head_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True)
         rev_head_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True)
 
-        xs_dict = collections.defaultdict(list)
-        ys_dict = collections.defaultdict(list)
-
+        # Group clipping by type
+        xs_dict: Dict[str, List[float]] = collections.defaultdict(list)
+        ys_dict: Dict[str, List[float]] = collections.defaultdict(list)
         for seg, y in zip(segments, offsets):
             for clip in seg.hard_clipping:
                 if clip.size >= min_hard_clipping_size:
@@ -1379,7 +1432,7 @@ class SequenceAlignment(TrackPainter):
                         else:
                             clip_type = "rev_tail"
 
-                    xs_dict[clip_type].append(clip.reference_position)
+                    xs_dict[clip_type].append(clip.reference_position - 0.5)
                     ys_dict[clip_type].append(y)
         for clip_type in set(xs_dict):
             xs = xs_dict[clip_type]
