@@ -36,6 +36,8 @@ from .custom_types import (
     Position,
     Axes,
     Base,
+    Point,
+    Line,
 )
 
 # TODO: label metadata
@@ -60,56 +62,81 @@ class CoverageDepth(TrackPainter):
 
 @dataclass
 class CigarOperation:
-    reference_offset: Optional[Position]
-    reference_position: Optional[Position]
+    segment: AlignedSegment
+    reference_offset: int  # Start position relative to segment.reference_start
+    size: int
+
+    @property
+    def reference_position(self) -> float:
+        reference_start = self.segment.reference_start
+        if reference_start is None:
+            raise ValueError("Segment is not aligned.")
+        return reference_start + self.reference_offset
+
 
 @dataclass
 class AlignmentMatch(CigarOperation):
-    reference_offset: Position
-    size: int
-    reference_position: Optional[Position]
-    
+    pass
 
 
 @dataclass
 class Insertion(CigarOperation):
-    reference_offset: float
-    size: int
-    reference_position: Optional[int]
+    pass
 
 
 @dataclass
 class Deletion(CigarOperation):
-    reference_offset: int
-    size: int
-    reference_position: Optional[int]
+    pass
 
 
 @dataclass
-class ModifiedBase(CigarOperation):
+class ModifiedBase:
     reference_position: int
     canonical_base: str
     modification: str
     strand: str
-    probability: Optional[float]
+    probability: Optional[float] = None
+
+
+@dataclass(init=False)
+class MismatchedBase(CigarOperation):
+    segment: AlignedSegment
+    reference_offset: int
+    size: int
+    query_offset: int
+    depth: int = 1
+
+    def __init__(
+        self,
+        segment: AlignedSegment,
+        reference_offset: int,
+        query_offset: int,
+        depth: int = 1,
+    ):
+        super().__init__(segment=segment, reference_offset=reference_offset, size=1)
+        self.query_offset = query_offset
+
+    @property
+    def query_position(self) -> int:
+        return self.query_offset
+
+    @property
+    def query_base(self) -> Base:
+        return self.segment.query_sequence[self.query_position]
+
+    @property
+    def reference_base(self) -> Base:
+        return self.segment.reference_sequence[self.reference_position]
 
 
 @dataclass
-class MismatchedBase(CigarOperation):
-    reference_offset: Optional[int]
-    query_offset: Optional[int]
-    reference_position: Optional[int]
-    query_position: Optional[int]
-    reference_base: Optional[str]
-    query_base: Optional[str]
-    depth: int = 1
+class ReferenceSkip(CigarOperation):
+    pass
 
 
 @dataclass
 class ClippedBases(CigarOperation):
-    reference_offset: float
-    size: int
-    reference_position: Optional[int]
+    pass
 
 
 class SoftClippedBases(ClippedBases):
@@ -125,17 +152,20 @@ class CIGAR:
     alignment_matches: List[AlignmentMatch]
     insertions: List[Insertion]
     deletions: List[Deletion]
+    reference_skips: List[ReferenceSkip]
     soft_clipping: List[SoftClippedBases]
     hard_clipping: List[HardClippedBases]
     mismatched_bases: Optional[List[MismatchedBase]] = None
 
     @classmethod
-    def from_cigartuples(
-        cls, cigartuples: List[Tuple[str, int]], *, reference_start=None
-    ):
+    def from_aligned_segment(cls, segment: AlignedSegment):
+        if segment.cigartuples is None:
+            raise ValueError("Segment is not aligned.")
+        cigartuples: List[Tuple[int, int]] = segment.cigartuples
         alignment_matches = []
         insertions = []
         deletions = []
+        reference_skips = []
         soft_clipping = []
         hard_clipping = []
         mismatched_bases = []
@@ -148,49 +178,60 @@ class CIGAR:
             elif operation == 1:  # Insertion
                 insertions.append(
                     Insertion(
-                        reference_position=None,
-                        reference_offset=ref_offset + 0.5,
+                        segment=segment,
+                        reference_offset=ref_offset,
                         size=length,
                     )
                 )
             elif operation == 2:  # Deletion
                 deletions.append(
                     Deletion(
-                        reference_position=None,
+                        segment=segment,
                         reference_offset=ref_offset,
                         size=length,
+                    )
+                )
+            elif operation == 3:  # Reference skip
+                reference_skips.append(
+                    ReferenceSkip(
+                        segment=segment,
+                        reference_offset=ref_offset,
+                        size=length
                     )
                 )
             elif operation == 4:  # Soft clipping
                 soft_clipping.append(
                     SoftClippedBases(
-                        reference_position=None,
-                        size=length,
-                        reference_offset=ref_offset - 0.5,
+                        segment=segment,
+                        reference_offset=ref_offset,
+                        size=length
                     )
                 )
             elif operation == 5:  # Hard clipping
                 hard_clipping.append(
                     HardClippedBases(
-                        reference_position=None,
+                        segment=segment,
                         size=length,
-                        reference_offset=ref_offset - 0.5,
+                        reference_offset=ref_offset,
                     )
                 )
             elif operation == 8:  # Mismatched bases
                 mismatched_bases += [
                     MismatchedBase(
-                        reference_position=None,
+                        segment=segment,
                         reference_offset=ref_offset + i,
                         query_offset=qry_offset + i,
-                        query_position=None,
-                        reference_base=None,
-                        query_base=None,
                     )
                     for i in range(length)
                 ]
-            if operation in (0, 7, 8): # Alignment matches
-                alignment_matches.append(AlignmentMatch(reference_offset=ref_offset, size=length, reference_position=None))
+            if operation in (0, 7, 8):  # Alignment matches
+                alignment_matches.append(
+                    AlignmentMatch(
+                        segment=segment,
+                        reference_offset=ref_offset,
+                        size=length,
+                    )
+                )
             if operation in (0, 2, 3, 7, 8):
                 # Only these operations 'consume reference'
                 ref_offset += length
@@ -201,20 +242,11 @@ class CIGAR:
                 # TODO: check Operation 9 (BAM_CBACK)
                 raise ValueError(f"operation={operation}")
 
-        if reference_start is not None:
-            for x in itertools.chain(
-                insertions,
-                deletions,
-                soft_clipping,
-                hard_clipping,
-                mismatched_bases or [],
-            ):
-                x.reference_position = reference_start + x.reference_offset
-
         return cls(
             alignment_matches=alignment_matches,
             insertions=insertions,
             deletions=deletions,
+            reference_skips=reference_skips,
             mismatched_bases=mismatched_bases
             if not found_op_match
             else None,  # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
@@ -224,10 +256,14 @@ class CIGAR:
 
 
 # A wrapper around pysam.AlignedSegment
-@dataclass
+@dataclass(init=False)
 class AlignedSegment:
     wrapped: pysam.AlignedSegment
-    alignment: Optional[SequenceAlignment] = None
+
+    def __init__(self, wrapped: pysam.AlignedSegment):
+        self.wrapped = wrapped
+        if self.cigartuples is not None:
+            self.cigar = CIGAR.from_aligned_segment(self)
 
     def __getattr__(self, name):
         return getattr(self.wrapped, name)
@@ -246,20 +282,14 @@ class AlignedSegment:
     def get_aligned_sequence(self, reference_start, reference_end=None):  # TODO
         pass
 
-    @functools.cached_property
-    def cigar(self):
-        return CIGAR.from_cigartuples(
-            self.cigartuples, reference_start=self.reference_start
-        )
-
     @property
-    def _alignment_match_intervals(self) -> List[Tuple[float, float]]: # TODO
+    def _alignment_match_intervals(self) -> List[Tuple[float, float]]:  # TODO
         reference_start = self.reference_start - 0.5
         intervals: List[Tuple[float, float]] = []
-        for m in self.cigar.alignment_matches:
-            interval_start = reference_start + m.reference_offset
+        for m in self.alignment_matches:
+            interval_start = m.reference_position - 0.5
             interval_end = interval_start + m.size
-            if intervals: 
+            if intervals:
                 # Check previous interval and merge if possible
                 previous_start, previous_end = intervals.pop(-1)
                 if interval_start - previous_end <= 0:
@@ -268,6 +298,10 @@ class AlignedSegment:
                     intervals.append((previous_start, previous_end))
             intervals.append((interval_start, interval_end))
         return intervals
+
+    @property
+    def alignment_matches(self) -> List[AlignmentMatch]:
+        return self.cigar.alignment_matches
 
     @property
     def insertions(self):
@@ -285,59 +319,9 @@ class AlignedSegment:
     def hard_clipping(self):
         return self.cigar.hard_clipping
 
-    @functools.cached_property
-    def mismatched_bases(self) -> Optional[List[MismatchedBase]]:
-        query_sequence = self.query_sequence
-        mismatched_bases: Optional[List[MismatchedBase]] = self.cigar.mismatched_bases
-        if mismatched_bases is not None:
-            # Use CIGAR mismatches if available
-            for m in mismatched_bases:
-                m.query_position = m.query_offset
-                m.query_base = query_sequence[m.query_position]
-        elif self.has_tag("MD"):
-            # M operations present in CIGAR string instead of =/X operations.
-            # Fall back to parsing the MD tag.
-            mismatched_bases = []
-            for qry_pos, ref_pos, ref_base in self.get_aligned_pairs(
-                matches_only=True, with_seq=True
-            ):
-                qry_base = query_sequence[qry_pos]
-                if qry_base != ref_base:
-                    mismatched_bases.append(
-                        MismatchedBase(
-                            reference_position=ref_pos,
-                            query_position=qry_pos,
-                            reference_base=ref_base,
-                            query_base=qry_base,
-                            reference_offset=None,
-                            query_offset=None,
-                        )
-                    )
-        elif self.alignment and self.alignment.reference_sequence:
-            # MD tag not present.
-            # Fall back to checking user-supplied reference sequence.
-            reference_sequence = self.alignment.reference_sequence
-            mismatched_bases = []
-            for qry_pos, ref_pos in self.get_aligned_pairs(
-                matches_only=True, with_seq=False
-            ):
-                ref_base = reference_sequence[ref_pos]
-                qry_base = query_sequence[qry_pos]
-                if qry_base != ref_base:
-                    mismatched_bases.append(
-                        MismatchedBase(
-                            reference_position=ref_pos,
-                            query_position=qry_pos,
-                            reference_base=ref_base,
-                            query_base=qry_base,
-                            reference_offset=None,
-                            query_offset=None,
-                        )
-                    )
-        else:
-            # All methods failed.
-            mismatched_bases = None
-        return mismatched_bases
+    @property
+    def mismatched_bases(self) -> List[MismatchedBase]:
+        return self.cigar.mismatched_bases
 
     @functools.cached_property
     def modified_bases(self) -> List[ModifiedBase]:
@@ -361,7 +345,6 @@ class AlignedSegment:
                     modified_bases.append(
                         ModifiedBase(
                             reference_position=reference_position,
-                            reference_offset=None,
                             canonical_base=canonical_base,
                             modification=modification,
                             strand=strand,
@@ -369,6 +352,10 @@ class AlignedSegment:
                         )
                     )
         return modified_bases
+
+    @property
+    def reference_skips(self) -> List[ReferenceSkip]:
+        return self.cigar.reference_skips
 
 
 @dataclass
@@ -753,7 +740,8 @@ class SequenceAlignment(TrackPainter):
         min_soft_clipping_size=10,
         show_hard_clipping=True,
         min_hard_clipping_size=10,
-        show_letters=False,
+        show_reference_skips: bool = True,
+        show_letters=False,  # TODO
         show_group_labels: Optional[bool] = None,
         show_group_separators=None,
         max_group_height=1000,
@@ -766,6 +754,7 @@ class SequenceAlignment(TrackPainter):
         modified_bases_kw={},
         soft_clipping_kw={},
         hard_clipping_kw={},
+        reference_skips_kw={},
         letters_kw={},
         group_labels_kw={},  # TODO
         group_separators_kw={},
@@ -872,6 +861,8 @@ class SequenceAlignment(TrackPainter):
                 min_deletion_size=min_deletion_size,
                 **deletions_kw,
             )
+        if show_reference_skips:
+            self._draw_reference_skips(ax, segments, offsets, **reference_skips_kw)
         if show_soft_clipping:
             self._draw_soft_clipping(
                 ax,
@@ -931,7 +922,6 @@ class SequenceAlignment(TrackPainter):
                 facecolors="none",
             )
         )
-        
 
     def _draw_arrowheads(self, ax, segments, offsets, height, *, colors, **kw):
 
@@ -1051,7 +1041,7 @@ class SequenceAlignment(TrackPainter):
         ys = []
         for seg, y in zip(segments, offsets):
             insertions = [i for i in seg.insertions if i.size >= min_insertion_size]
-            xs += [i.reference_position for i in insertions]
+            xs += [i.reference_position + 0.5 for i in insertions]
             ys += [y] * len(insertions)
 
         ax.plot(
@@ -1079,7 +1069,7 @@ class SequenceAlignment(TrackPainter):
                 Path.MOVETO,
                 Path.LINETO,
                 Path.MOVETO,
-            ], 
+            ],
             readonly=True,
         )
         return marker
@@ -1132,6 +1122,29 @@ class SequenceAlignment(TrackPainter):
                 colors="k",
                 zorder=1.1,
                 facecolors="none",
+            )
+        )
+
+    def _draw_reference_skips(
+        self, ax, segments, offsets, *, color="lightgray", linewidth=1.5, **kw
+    ):
+        skip_lines: List[Line] = []
+        for seg, y in zip(segments, offsets):
+            skip_lines += [
+                (
+                    (skip.reference_position - 0.5, y),
+                    (skip.reference_position - 0.5 + skip.size, y),
+                )
+                for skip in seg.reference_skips
+            ]
+        ax.add_collection(
+            LineCollection(
+                skip_lines,
+                linewidths=linewidth,
+                colors=color,
+                zorder=-0.2,
+                facecolors="none",
+                **kw,
             )
         )
 
@@ -1232,9 +1245,10 @@ class SequenceAlignment(TrackPainter):
         linestyle="-",
         **kw,
     ):
-        # Link segments
-        link_ls_dict = self._link_segments(segments, links)
-        link_offset_dict = {}
+        link_ls_dict: Dict[LinkIdentifier, LinkedSegment] = self._link_segments(
+            segments, links
+        )
+        link_offset_dict: Dict[LinkIdentifier, int] = {}
         for link, y in zip(links, offsets):
             if link in link_offset_dict:
                 if link_offset_dict[link] != y:
@@ -1242,7 +1256,7 @@ class SequenceAlignment(TrackPainter):
             else:
                 link_offset_dict[link] = y
 
-        lines = [
+        link_lines: List[Line] = [
             (
                 (ls.reference_start - 0.5, link_offset_dict[link]),
                 (ls.reference_end - 0.5, link_offset_dict[link]),
@@ -1251,10 +1265,10 @@ class SequenceAlignment(TrackPainter):
         ]
         ax.add_collection(
             LineCollection(
-                lines,
+                link_lines,
                 linewidths=linewidth,
                 colors=color,
-                zorder=-1,
+                zorder=-0.3,
                 facecolors="none",
             )
         )
