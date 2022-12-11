@@ -125,8 +125,8 @@ class MismatchedBase(CigarOperation):
         return self.segment.query_sequence[self.query_position]
 
     @property
-    def reference_base(self) -> Base:
-        return self.segment.reference_sequence[self.reference_position]
+    def reference_base(self) -> str:
+        return self.segment.reference_sequence[self.reference_offset]
 
 
 @dataclass
@@ -155,7 +155,7 @@ class CIGAR:
     reference_skips: List[ReferenceSkip]
     soft_clipping: List[SoftClippedBases]
     hard_clipping: List[HardClippedBases]
-    mismatched_bases: Optional[List[MismatchedBase]] = None
+    mismatched_bases: List[MismatchedBase]
 
     @classmethod
     def from_aligned_segment(cls, segment: AlignedSegment):
@@ -171,10 +171,10 @@ class CIGAR:
         mismatched_bases = []
         ref_offset = 0
         qry_offset = 0
-        found_op_match = False
+
         for operation, length in cigartuples:
             if operation == 0:  # Alignment match; may not be a sequence match
-                found_op_match = True
+                pass
             elif operation == 1:  # Insertion
                 insertions.append(
                     Insertion(
@@ -247,13 +247,19 @@ class CIGAR:
             insertions=insertions,
             deletions=deletions,
             reference_skips=reference_skips,
-            mismatched_bases=mismatched_bases
-            if not found_op_match
-            else None,  # In the presence of the ambiguous "M" operation, disgard the "X" operations to be safe
+            mismatched_bases=mismatched_bases,
             soft_clipping=soft_clipping,
             hard_clipping=hard_clipping,
         )
 
+
+@dataclass
+class MDMismachedBase: # TODO
+    reference_position: int
+    canonical_base: str
+    modification: str
+    strand: str
+    probability: Optional[float] = None
 
 # A wrapper around pysam.AlignedSegment
 @dataclass(init=False)
@@ -267,6 +273,10 @@ class AlignedSegment:
 
     def __getattr__(self, name):
         return getattr(self.wrapped, name)
+
+    @functools.cached_property
+    def reference_sequence(self) -> str:
+        return self.wrapped.get_reference_sequence()
 
     @functools.cached_property
     def reference_position_dict(self) -> Dict[int, Optional[int]]:
@@ -1397,15 +1407,11 @@ class SequenceAlignment(TrackPainter):
             lambda: None
         )
         for seg in self.segments:
-            if seg.mismatched_bases is not None:
-                for mb in seg.mismatched_bases:
-                    if (
-                        mb.reference_base is not None
-                        and mb.reference_position not in reference_base_dict
-                    ):
-                        reference_base_dict[
-                            mb.reference_position
-                        ] = mb.reference_base.upper()
+            for mb in seg.mismatched_bases:
+                if mb.reference_position not in reference_base_dict:
+                    reference_base_dict[
+                        mb.reference_position
+                    ] = mb.reference_base.upper()
         return reference_base_dict
 
     def draw_pileup(
