@@ -6,5 +6,6 @@ GroupIdentifier = NativeHashable
 LinkIdentifier = NativeHashable
 Color = Union[Tuple[float, float, float], Tuple[float, float, float, float], str]
 Position = Union[int, float]
+Point = Tuple[float, float]
 Axes = axes.Axes
 Base = Literal["A", "T", "C", "G"]

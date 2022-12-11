@@ -122,7 +122,7 @@ class HardClippedBases(ClippedBases):
 
 @dataclass
 class CIGAR:
-    alignment_matches: List[Tuple[int, int]]
+    alignment_matches: List[AlignmentMatch]
     insertions: List[Insertion]
     deletions: List[Deletion]
     soft_clipping: List[SoftClippedBases]
@@ -253,10 +253,20 @@ class AlignedSegment:
         )
 
     @property
-    def alignment_match_intervals(self) -> List[Tuple[Position, Position]]: # TODO
-        intervals: List[Tuple[int, int]] = []
+    def _alignment_match_intervals(self) -> List[Tuple[float, float]]: # TODO
+        reference_start = self.reference_start - 0.5
+        intervals: List[Tuple[float, float]] = []
         for m in self.cigar.alignment_matches:
-            pass
+            interval_start = reference_start + m.reference_offset
+            interval_end = interval_start + m.size
+            if intervals: 
+                # Check previous interval and merge if possible
+                previous_start, previous_end = intervals.pop(-1)
+                if interval_start - previous_end <= 0:
+                    interval_start = previous_start
+                else:
+                    intervals.append((previous_start, previous_end))
+            intervals.append((interval_start, interval_end))
         return intervals
 
     @property
@@ -906,10 +916,12 @@ class SequenceAlignment(TrackPainter):
         ax.set_yticks([])
 
     def _draw_backbones(self, ax, segments, offsets, height, *, colors, **kw):
-        lines = [
-            ((seg.reference_start - 0.5, y), (seg.reference_end - 0.5, y))
-            for seg, y in zip(segments, offsets)
-        ]
+        lines: List[Tuple[Point, Point]] = []
+        for seg, y in zip(segments, offsets):
+            for interval_start, interval_end in seg._alignment_match_intervals:
+                start_point = (interval_start, y)
+                end_point = (interval_end, y)
+                lines.append((start_point, end_point))
         ax.add_collection(
             LineCollection(
                 lines,
@@ -919,6 +931,7 @@ class SequenceAlignment(TrackPainter):
                 facecolors="none",
             )
         )
+        
 
     def _draw_arrowheads(self, ax, segments, offsets, height, *, colors, **kw):
 
