@@ -95,13 +95,8 @@ class ModifiedBase:
     probability: Optional[float] = None
 
 
-@dataclass(init=True, repr=True)
-class _MismatchedBase:
-    _reference_position: int
-    _query_position: int
-    _reference_base: str
-    _query_base: str
 
+class _MismatchedBase:
     @property
     def reference_position(self) -> int:
         raise NotImplementedError
@@ -119,18 +114,21 @@ class _MismatchedBase:
         raise NotImplementedError
 
 
+@dataclass(init=False)
 class MdMismatchedBase(_MismatchedBase):
     """
     A mismatched base inferred from MD tag.
     """
-    def __init__(
-        self,
-        reference_position: int,
-        query_position: int,
-        reference_base: Base,
-        query_base: Base,
-    ):
-        super().__init__(reference_position, query_position, reference_base, query_base)
+    _reference_position: int
+    _query_position: int
+    _reference_base: Base
+    _query_base: Base
+
+    def __init__(self, reference_position, query_position, reference_base, query_base):
+        self._reference_position = reference_position
+        self._query_position = query_position
+        self._reference_base = reference_base
+        self._query_base = query_base
 
     @property
     def reference_position(self) -> int:
@@ -149,20 +147,16 @@ class MdMismatchedBase(_MismatchedBase):
         return self._query_base
 
 
-@dataclass(init=False)
+@dataclass(frozen=True)
 class CigarMismatchedBase(_MismatchedBase):
     """
     A mismatched base inferred from CIGAR.
     """
-    def __init__(
-        self,
-        segment: AlignedSegment,
-        reference_offset: int,
-        query_offset: int,
-    ):
-        self.segment = segment
-        self.reference_offset = reference_offset
-        self.query_offset = query_offset
+    segment: AlignedSegment
+    reference_offset: int
+    query_offset: int
+
+    
 
     @property
     def reference_position(self) -> int:
