@@ -52,9 +52,13 @@ def sort_by(
     [('b', 'c', 'a'), ('y', 'z', 'x')]
     """
     # Check iterable lengths are equal
-    if len(set(len(x) for x in iterables)) > 1:
+    lengths = [len(x) for x in iterables]
+    if len(set(lengths)) > 1:
         raise ValueError("Iterables must have the same length.")
-
+    # Return early if iterables are empty
+    if any(l == 0 for l in lengths):
+        return [[] for x in iterables]
+    
     zipped_lists = list(zip(*iterables))
     sorted_zipped_lists = [
         x
@@ -77,8 +81,12 @@ def filter_by(*iterables: Sequence, by: Sequence[bool]) -> List[List]:
     [('a', 'c'), ('x', 'z')]
     """
     # Check iterable lengths are equal
-    if len(set(len(x) for x in iterables)) > 1:
+    lengths = [len(x) for x in iterables]
+    if len(set(lengths)) > 1:
         raise ValueError("Iterables must have the same length.")
+    # Return early if iterables are empty
+    if any(l == 0 for l in lengths):
+        return [[] for x in iterables]
 
     zipped_lists = list(zip(*iterables))
     filtered_zipped_lists = [x for (x, b) in zip(zipped_lists, by) if b]

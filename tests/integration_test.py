@@ -97,13 +97,20 @@ def test_IGH():
 
 
 def test_GAPDH_RNAseq():
+    CHROMOSOME, START, END = "chr12", 6.643e6, 6.648e6
     RNA_BAM_PATH = "tests/data/GM12878_RNAseq_GAPDH.sample=0.002.bam"
+    REFSEQ_GFF_PATH = "tests/data/Refseq_GRCh37_genomic_annotation.gff.gz"
     OUTPUT_PNG_PATH = "tests/output/GM12878_RNAseq_GAPDH.png"
 
-    p = lv.SequenceAlignment.from_file(RNA_BAM_PATH, "rb")
-    gv = lv.GenomeViewer(2, figsize=(8, 8), height_ratios=(1, 7))
-    p.draw_pileup(gv.axes[0], show_mismatches=False)
-    p.draw_alignment(
+    alignment_painter = lv.SequenceAlignment.from_file(RNA_BAM_PATH, "rb")
+    with gzip.open(REFSEQ_GFF_PATH, "rt") as f:
+        annotation_painter = lv.GeneAnnotation.from_refseq_gff(
+            file_object=f, build='GRCh37', chromosome=CHROMOSOME,  start=START, end=END
+        )
+
+    gv = lv.GenomeViewer(3, figsize=(8, 8), height_ratios=(1, 7 ,2))
+    alignment_painter.draw_pileup(gv.axes[0], show_mismatches=False)
+    alignment_painter.draw_alignment(
         gv.axes[1],
         show_arrowheads=False,
         show_soft_clipping=False,
@@ -112,8 +119,9 @@ def test_GAPDH_RNAseq():
         show_group_labels=False,
         show_group_separators=False,
     )
+    annotation_painter.draw_transcripts(gv.axes[2])
     gv.set_xlim(6.643e6, 6.648e6)
-    gv.set_xlabel("chr12 (Mb)")
+    gv.set_xlabel(f"{CHROMOSOME} (Mb)")
     gv.axes[-1].xaxis.set_major_formatter(lv.util.base_formatter(unit="mb", fmt="{:.3f}"))
     gv.set_title(r"GM12878 $\it{GAPDH}$ RNAseq")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
