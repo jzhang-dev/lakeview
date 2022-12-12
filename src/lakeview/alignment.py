@@ -60,7 +60,7 @@ class CoverageDepth(TrackPainter):
         pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class CigarOperation:
     segment: AlignedSegment
     reference_offset: int  # Start position relative to segment.reference_start
@@ -74,17 +74,14 @@ class CigarOperation:
         return reference_start + self.reference_offset
 
 
-@dataclass
 class AlignmentMatch(CigarOperation):
     pass
 
 
-@dataclass
 class Insertion(CigarOperation):
     pass
 
 
-@dataclass
 class Deletion(CigarOperation):
     pass
 
@@ -98,43 +95,96 @@ class ModifiedBase:
     probability: Optional[float] = None
 
 
-@dataclass(init=False)
-class MismatchedBase(CigarOperation):
-    segment: AlignedSegment
-    reference_offset: int
-    size: int
-    query_offset: int
-    depth: int = 1
+@dataclass(init=True, repr=True)
+class _MismatchedBase:
+    _reference_position: int
+    _query_position: int
+    _reference_base: str
+    _query_base: str
 
+    @property
+    def reference_position(self) -> int:
+        raise NotImplementedError
+
+    @property
+    def query_position(self) -> int:
+        raise NotImplementedError
+
+    @property
+    def reference_base(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def query_base(self) -> str:
+        raise NotImplementedError
+
+
+class MdMismatchedBase(_MismatchedBase):
+    """
+    A mismatched base inferred from MD tag.
+    """
+    def __init__(
+        self,
+        reference_position: int,
+        query_position: int,
+        reference_base: Base,
+        query_base: Base,
+    ):
+        super().__init__(reference_position, query_position, reference_base, query_base)
+
+    @property
+    def reference_position(self) -> int:
+        return self._reference_position
+
+    @property
+    def query_position(self) -> int:
+        return self._query_position
+
+    @property
+    def reference_base(self) -> str:
+        return self._reference_base
+
+    @property
+    def query_base(self) -> str:
+        return self._query_base
+
+
+@dataclass(init=False)
+class CigarMismatchedBase(_MismatchedBase):
+    """
+    A mismatched base inferred from CIGAR.
+    """
     def __init__(
         self,
         segment: AlignedSegment,
         reference_offset: int,
         query_offset: int,
-        depth: int = 1,
     ):
-        super().__init__(segment=segment, reference_offset=reference_offset, size=1)
+        self.segment = segment
+        self.reference_offset = reference_offset
         self.query_offset = query_offset
+
+    @property
+    def reference_position(self) -> int:
+        return self.segment.reference_start + self.reference_offset
 
     @property
     def query_position(self) -> int:
         return self.query_offset
 
     @property
-    def query_base(self) -> Base:
-        return self.segment.query_sequence[self.query_position]
-
-    @property
     def reference_base(self) -> str:
         return self.segment.reference_sequence[self.reference_offset]
 
+    @property
+    def query_base(self) -> str:
+        return self.segment.query_sequence[self.query_position]
 
-@dataclass
+
 class ReferenceSkip(CigarOperation):
     pass
 
 
-@dataclass
 class ClippedBases(CigarOperation):
     pass
 
@@ -155,7 +205,7 @@ class CIGAR:
     reference_skips: List[ReferenceSkip]
     soft_clipping: List[SoftClippedBases]
     hard_clipping: List[HardClippedBases]
-    mismatched_bases: List[MismatchedBase]
+    mismatched_bases: List[CigarMismatchedBase]
 
     @classmethod
     def from_aligned_segment(cls, segment: AlignedSegment):
@@ -213,7 +263,7 @@ class CIGAR:
                 )
             elif operation == 8:  # Mismatched bases
                 mismatched_bases += [
-                    MismatchedBase(
+                    CigarMismatchedBase(
                         segment=segment,
                         reference_offset=ref_offset + i,
                         query_offset=qry_offset + i,
@@ -247,14 +297,6 @@ class CIGAR:
             soft_clipping=soft_clipping,
             hard_clipping=hard_clipping,
         )
-
-
-@dataclass
-class MdMismatchedBase:  # TODO
-    reference_position: int
-    query_position: int
-    reference_base: int
-    query_base: int
 
 
 # A wrapper around pysam.AlignedSegment
@@ -321,8 +363,7 @@ class AlignedSegment:
         pass
 
     @property
-    def _alignment_match_intervals(self) -> List[Tuple[float, float]]:  # TODO
-        reference_start = self.reference_start - 0.5
+    def _alignment_match_intervals(self) -> List[Tuple[float, float]]:
         intervals: List[Tuple[float, float]] = []
         for m in self.alignment_matches:
             interval_start = m.reference_position - 0.5
@@ -376,7 +417,7 @@ class AlignedSegment:
         return mismatched_bases
 
     @functools.cached_property
-    def mismatched_bases(self) -> List[MismatchedBase]:
+    def mismatched_bases(self) -> List[_MismatchedBase]:
         if self.cigar.mismatched_bases:
             mismatched_bases = self.cigar.mismatched_bases
         elif self.has_tag("MD"):
@@ -572,7 +613,7 @@ class SequenceAlignment(TrackPainter):
         *,
         max_group_offset: float,
         min_spacing: float,
-    ) -> np.ndarray:
+    ) -> List[int]:
         if not len(segments) == len(links) == len(groups):
             raise ValueError
         # TODO: check no segments from differenct groups are linked together
@@ -588,7 +629,7 @@ class SequenceAlignment(TrackPainter):
             group_offsets[group_offsets > max_group_offset] = -np.inf
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
-        return offsets
+        return list(offsets)
 
     def _parse_segment_parameters(
         self,
@@ -846,7 +887,7 @@ class SequenceAlignment(TrackPainter):
         )
 
         # Get segment offsets
-        offset_array = self._get_segment_offsets(
+        offsets = self._get_segment_offsets(
             segments,
             links,
             groups,
@@ -856,7 +897,7 @@ class SequenceAlignment(TrackPainter):
 
         # Remove segments exceeding `max_group_offset`
         segments, links, groups, offsets, colors = helpers.filter_by(
-            segments, links, groups, offset_array, colors, by=offset_array >= 0
+            segments, links, groups, offsets, colors, by=[y >= 0 for y in offsets]
         )
 
         # Get segment height

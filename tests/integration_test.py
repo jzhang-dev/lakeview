@@ -5,6 +5,9 @@ import lakeview as lv
 
 
 def test_SKBR3():
+    """
+    These two BAM files have MD tag but no =/X CIGAR operations.
+    """
     ILLUMINA_BAM_PATH = "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam"
     PACBIO_BAM_PATH = "tests/data/SKBR3_PacBio.bam"
     OUTPUT_PNG_PATH = "tests/output/SKBR3_Illumina_PacBio.png"
