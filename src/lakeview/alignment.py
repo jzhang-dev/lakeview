@@ -631,7 +631,7 @@ class SequenceAlignment(TrackPainter):
         sort_by: Union[
             Callable[[AlignedSegment], NativeHashable],
             Iterable[NativeHashable],
-            str,
+            Literal['start', 'length'],
             None,
         ],
         link_by: Union[
@@ -794,13 +794,13 @@ class SequenceAlignment(TrackPainter):
         sort_by: Union[
             Callable[[AlignedSegment], NativeHashable],
             Iterable[NativeHashable],
-            str,
+            Literal['start', 'length'],
             None,
         ] = None,
         link_by: Union[
             Callable[[AlignedSegment], LinkIdentifier],
             Iterable[LinkIdentifier],
-            str,
+            Literal['pair', 'name'],
             None,
         ] = None,
         group_by: Union[
@@ -816,7 +816,7 @@ class SequenceAlignment(TrackPainter):
             None,
         ] = None,
         color_by: Union[
-            Callable[[AlignedSegment], Color],  # TODO: define a color type
+            Callable[[AlignedSegment], Color],  
             Iterable[Color],
             str,
             None,
@@ -1012,6 +1012,7 @@ class SequenceAlignment(TrackPainter):
                 start_point = (interval_start, y)
                 end_point = (interval_end, y)
                 lines.append((start_point, end_point))
+        # Match line
         ax.add_collection(
             LineCollection(
                 lines,
@@ -1033,6 +1034,7 @@ class SequenceAlignment(TrackPainter):
         forward_colors = [c for seg, c in zip(segments, colors) if seg.is_forward]
         reverse_colors = [c for seg, c in zip(segments, colors) if seg.is_reverse]
 
+        # Arrorhead marker
         for xs, ys, marker, marker_colors in zip(
             (forward_xs, reverse_xs),
             (forward_ys, reverse_ys),
@@ -1050,7 +1052,7 @@ class SequenceAlignment(TrackPainter):
                     color=marker_colors[0],
                     markeredgecolor="none",
                     ls="",
-                    zorder=1,
+                    zorder=0.1,
                 )
             else:
                 ax.scatter(
@@ -1060,7 +1062,7 @@ class SequenceAlignment(TrackPainter):
                     marker=marker,
                     s=height**2,
                     ec="none",
-                    zorder=1,
+                    zorder=0.1,
                 )
 
     def _draw_alignment_mismatches(
@@ -1142,7 +1144,7 @@ class SequenceAlignment(TrackPainter):
             insertions = [i for i in seg.insertions if i.size >= min_insertion_size]
             xs += [i.reference_position + 0.5 for i in insertions]
             ys += [y] * len(insertions)
-
+        # Insertion marker
         ax.plot(
             xs,
             ys,
@@ -1152,7 +1154,7 @@ class SequenceAlignment(TrackPainter):
             markerfacecolor="none",
             markeredgecolor=color,
             ls="",
-            zorder=2,
+            zorder=0.4,
             **kw,
         )
 
@@ -1200,7 +1202,7 @@ class SequenceAlignment(TrackPainter):
             xs += [d.reference_position + d.size / 2 for d in deletions]
             ys += [y] * len(deletions)
 
-        # Marker
+        # Deletion marker
         ax.plot(
             xs,
             ys,
@@ -1210,22 +1212,22 @@ class SequenceAlignment(TrackPainter):
             markerfacecolor="none",
             ls="",
             linewidth=linewidth,
-            zorder=1.2,
+            zorder=0.3,
             **kw,
         )
-        # Black line
+        # Deletion line
         ax.add_collection(
             LineCollection(
                 lines,
                 linewidths=1,
                 colors="k",
-                zorder=1.1,
+                zorder=-0.1,
                 facecolors="none",
             )
         )
 
     def _draw_reference_skips(
-        self, ax, segments, offsets, *, color="lightgray", linewidth=1.5, **kw
+        self, ax, segments, offsets, *, color: Color="#96b8c8", linewidth=1, **kw
     ):
         skip_lines: List[Line] = []
         for seg, y in zip(segments, offsets):
@@ -1258,7 +1260,7 @@ class SequenceAlignment(TrackPainter):
             Tuple[Base, str, Literal["+", "-"]], Union[str, mpl.colors.Colormap]
         ] = {("C", "m", "+"): "Reds", ("C", "m", "-"): "Reds"},
         linewidth=1,
-        zorder=3,
+        zorder=0.6,
         **kw,
     ):
         marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
@@ -1389,6 +1391,7 @@ class SequenceAlignment(TrackPainter):
         tail_marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
         fwd_head_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True)
         rev_head_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True)
+        # TODO: change the marker if show_arrowheads=False
 
         # Group clipping by type
         xs_dict: Dict[str, List[float]] = collections.defaultdict(list)

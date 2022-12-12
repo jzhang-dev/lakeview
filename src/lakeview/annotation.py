@@ -1,14 +1,25 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from typing import Optional, Dict, List, Union, Callable, Iterable, Sequence
+from typing import (
+    Optional,
+    Dict,
+    List,
+    Union,
+    Callable,
+    Iterable,
+    Sequence,
+    Literal,
+    Tuple,
+    Mapping
+)
 from dataclasses import dataclass, field
 import warnings
 import numpy as np
 from matplotlib.collections import LineCollection
 
 from . import helpers
-from .custom_types import Color, Axes
+from .custom_types import GroupIdentifier, Color, Axes, NativeHashable
 
 
 @dataclass
@@ -66,7 +77,7 @@ class GeneAnnotation:
     @staticmethod
     def parse_file(
         file_object,
-        format,
+        format_: Literal["gtf", "gff", "gff3"],
         *,
         features=None,
         sequence_name=None,
@@ -77,8 +88,7 @@ class GeneAnnotation:
         # Ref: http://daler.github.io/gffutils/dialect.html
         # Ref: https://mblab.wustl.edu/GTF22.html
         # Ref: https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
-        format = format.lower()
-        if format == "gtf":
+        if format_ == "gtf":
             attr_kw = dict(
                 field_separator="; ",
                 keyval_separator=" ",
@@ -87,7 +97,7 @@ class GeneAnnotation:
                 trim_prefix=0,
                 trim_suffix=1,
             )
-        elif format in ("gff", "gff3"):
+        elif format_ in ("gff", "gff3"):
             attr_kw = dict(
                 field_separator=";",
                 keyval_separator="=",
@@ -150,7 +160,7 @@ class GeneAnnotation:
         file_path=None,
         file_object=None,
         *,
-        format,
+        format_,
         preset="auto",
         sequence_name=None,
         start=None,
@@ -170,7 +180,7 @@ class GeneAnnotation:
             )
         features = gene_features + transcript_features + exon_features + cds_features
         parse_kw = dict(
-            format=format,
+            format_=format_,
             features=features,
             sequence_name=sequence_name,
             start=start,
@@ -226,7 +236,7 @@ class GeneAnnotation:
                 raise ValueError("Failed to automatically detect `transcript_key`.")
         return transcript_key
 
-    def _parse_runtime_parameters(
+    def _parse_runtime_parameters( # TODO: delete?
         self,
         *,
         color_by,
@@ -313,7 +323,7 @@ class GeneAnnotation:
         return np.array(helpers.pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
-    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> np.ndarray:
+    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> List[int]:
         offsets = np.zeros(len(transcripts))
         y = 0
         for group in list(sorted(set(groups))):
@@ -323,18 +333,126 @@ class GeneAnnotation:
             group_offsets[group_offsets > max_group_offset] = -np.inf
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
-        return offsets
+        return list(offsets)
+
+    def _parse_transcript_parameters(
+        self,
+        *,
+        sort_by: Union[
+            Callable[[AnnotationRecord], NativeHashable],
+            Iterable[NativeHashable],
+            None,
+        ] = None,
+        group_by: Union[
+            Callable[[AnnotationRecord], GroupIdentifier],
+            Iterable[GroupIdentifier],
+            None,
+        ] = None,
+        filter_by: Union[
+            Callable[[AnnotationRecord], bool],
+            Iterable[bool],
+            None,
+        ] = None,
+        color_by: Union[
+            Callable[[AnnotationRecord], Color],
+            Iterable[Color],
+            None,
+        ] = None,
+        label_by: Union[
+            Callable[[AnnotationRecord], str],
+            Iterable[str],
+            None,
+        ] = None,
+    ) -> Tuple[List[AnnotationRecord], List[GroupIdentifier], List[Color], List[str]]:
+        transcripts = self.transcripts
+        n_transcripts = len(transcripts)
+
+        # Groups
+        groups: List[GroupIdentifier] = []
+        if group_by is None:
+            groups = [0] * n_transcripts
+        elif callable(group_by):
+            groups = [group_by(t) for t in transcripts]
+        elif isinstance(group_by, Iterable):
+            groups = list(group_by)
+
+        # Colors
+        colors: List[Color] = []
+        if color_by is None:
+            colors = ["b"] * n_transcripts
+        elif callable(color_by):
+            colors = [color_by(t) for t in transcripts]
+        elif isinstance(color_by, Iterable):
+            colors = list(color_by)
+
+        # Labels
+        labels: List[str] = []
+        if label_by is None:
+            labels = [""] * n_transcripts
+        if callable(label_by):
+            labels = [label_by(t) for t in transcripts]
+        elif isinstance(label_by, Iterable):
+            labels = list(label_by)
+
+        # Filter transcripts
+        selection: List[bool] = []
+        if isinstance(filter_by, Iterable):
+            selection = list(filter_by)
+            if len(selection) != n_transcripts:
+                raise ValueError()
+        elif callable(filter_by):
+            selection = [filter_by(t) for t in transcripts]
+        if filter_by is not None:
+            transcripts, groups, labels = helpers.filter_by(
+                transcripts, groups, labels, by=selection
+            )
+            if not transcripts:
+                warnings.warn("All segments removed after filtering.")
+
+        # Sort transcripts
+        if callable(sort_by):
+            keys = [sort_by(t) for t in transcripts]
+        if sort_by is not None:
+            transcripts, groups, labels = helpers.sort_by(
+                transcripts, groups, labels, by=keys
+            )
+
+        return transcripts, groups, colors, labels
 
     def draw_transcripts(  # TODO: mask = None for reversible subsetting
         self,
-        ax,
+        ax: Axes,
         *,
-        height=None,
-        groups=None,
-        colors=None,
-        order=None,
-        labels=None,
-        max_group_height=float("inf"),
+        sort_by: Union[
+            Callable[[AnnotationRecord], NativeHashable],
+            Iterable[NativeHashable],
+            None,
+        ] = None,
+        group_by: Union[
+            Callable[[AnnotationRecord], GroupIdentifier],
+            Iterable[GroupIdentifier],
+            None,
+        ] = None,
+        filter_by: Union[
+            Callable[[AnnotationRecord], bool],
+            Iterable[bool],
+            None,
+        ] = None,
+        color_by: Union[
+            Callable[[AnnotationRecord], Color],
+            Iterable[Color],
+            None,
+        ] = None,
+        label_by: Union[
+            Callable[[AnnotationRecord], str],
+            Iterable[str],
+            None,
+        ] = None,
+        group_labels: Union[
+            Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
+        ] = None,
+        height: Optional[float] = None,
+        max_group_height=100,
         transcripts_kw={},
         exons_kw={},
         cdss_kw={},
@@ -343,36 +461,21 @@ class GeneAnnotation:
         transcripts = self.transcripts
         n_transcripts = len(transcripts)
 
-        if colors is None:
-            colors = ["b"] * n_transcripts
-        if isinstance(colors, Callable):
-            colors = [colors(t) for t in transcripts]
-        if groups is None:
-            groups = [0] * n_transcripts
-        if isinstance(groups, Callable):
-            groups = [groups(t) for t in transcripts]
-        if isinstance(order, Callable):
-            order = [order(t) for t in transcripts]
-        if isinstance(labels, Callable):
-            labels = [labels(t) for t in transcripts]
-
-        if len(groups) != n_transcripts:
-            raise ValueError()
-        if len(colors) != n_transcripts:
-            raise ValueError()
-        if order is not None and len(order) != n_transcripts:
-            raise ValueError()
-        if order is not None:
-            transcripts, colors, groups = helpers.sort_by(
-                transcripts, colors, groups, by=order
-            )
+        transcripts, groups, colors, labels = self._parse_transcript_parameters(
+            sort_by=sort_by,
+            group_by=group_by,
+            color_by=color_by,
+            filter_by=filter_by,
+            label_by=label_by,
+        )
 
         offsets = self._get_transcript_offsets(
             transcripts, groups, max_group_offset=max_group_height - 1
         )
         transcripts, colors, groups, labels, offsets = helpers.filter_by(
-            transcripts, colors, groups, labels, offsets, by=offsets >= 0
+            transcripts, colors, groups, labels, offsets, by=[y >= 0 for y in offsets]
         )
+
         if height is None:
             _, ax_height = helpers.get_ax_size(ax)
             height = max(

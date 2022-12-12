@@ -29,7 +29,9 @@ def test_SKBR3():
     gv.axes[1].set_ylabel("Illumina")
     gv.axes[3].set_ylabel("PacBio")
     gv.set_xlabel("chr17")
-    gv.axes[-1].xaxis.set_major_formatter(lv.util.base_formatter(unit="mb", fmt="{:.3f}"))
+    gv.axes[-1].xaxis.set_major_formatter(
+        lv.util.base_formatter(unit="mb", fmt="{:.3f}")
+    )
     gv.set_title("SKBR3")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 200e3
@@ -65,7 +67,7 @@ def test_IGH():
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
         gencode_painter = lv.GeneAnnotation.from_file(
             file_object=f,
-            format="gtf",
+            format_="gtf",
             sequence_name=CHROMOSOME,
             start=START,
             end=END,
@@ -85,7 +87,7 @@ def test_IGH():
         max_group_height=50,
     )
     gencode_painter.draw_transcripts(
-        gv.axes[2], max_group_height=4, labels=lambda t: t.attributes["gene_name"]
+        gv.axes[2], max_group_height=4, label_by=lambda t: t.attributes["gene_name"]
     )
 
     gv.set_xlim((105679000, 105776000))
@@ -93,6 +95,33 @@ def test_IGH():
     gv.set_title("HG002 IGH PacBio + Gencode")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
+
+
+def test_GAPDH_RNAseq():
+    RNA_BAM_PATH = "tests/data/GM12878_RNAseq_GAPDH.sample=0.002.bam"
+    OUTPUT_PNG_PATH = "tests/output/GM12878_RNAseq_GAPDH.png"
+
+    p = lv.SequenceAlignment.from_file(RNA_BAM_PATH, "rb")
+    gv = lv.GenomeViewer(2, figsize=(8, 8), height_ratios=(1, 7))
+    p.draw_pileup(gv.axes[0], show_mismatches=False)
+    p.draw_alignment(
+        gv.axes[1],
+        show_arrowheads=False,
+        show_soft_clipping=False,
+        show_mismatches=True,
+        max_group_height=50,
+        show_group_labels=False,
+        show_group_separators=False,
+    )
+    gv.set_xlim(6.643e6, 6.648e6)
+    gv.set_xlabel("chr12 (Mb)")
+    gv.axes[-1].xaxis.set_major_formatter(lv.util.base_formatter(unit="mb", fmt="{:.3f}"))
+    gv.set_title(r"GM12878 $\it{GAPDH}$ RNAseq")
+    gv.savefig(OUTPUT_PNG_PATH, dpi=300)
+    assert os.path.getsize(OUTPUT_PNG_PATH) > 80e3
+
+
+
 
 
 def test_SNURF_methylation():
