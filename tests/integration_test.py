@@ -65,14 +65,12 @@ def test_IGH():
     OUTPUT_PNG_PATH = "tests/output/IGH_PacBio_Gencode.png"
 
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
-        gencode_painter = lv.GeneAnnotation.from_file(
+        gencode_painter = lv.GeneAnnotation.from_gencode_gtf(
             file_object=f,
-            format_="gtf",
-            sequence_name=CHROMOSOME,
+            chromosome=CHROMOSOME,
             start=START,
             end=END,
         )
-    gencode_painter.transcripts.sort(key=len, reverse=True)
     pacbio_painter = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, "rb")
 
     gv = lv.GenomeViewer(3, height_ratios=(1, 8, 2))
@@ -87,7 +85,8 @@ def test_IGH():
         max_group_height=50,
     )
     gencode_painter.draw_transcripts(
-        gv.axes[2], max_group_height=4, label_by=lambda t: t.attributes["gene_name"]
+        gv.axes[2], max_group_height=4, label_by=lambda t: t.attributes["gene_name"],
+        sort_by=lambda t: -len(t)
     )
 
     gv.set_xlim((105679000, 105776000))
@@ -138,7 +137,7 @@ def test_SNURF_methylation():
             colormaps={("C", "m", "+"): "cividis", ("C", "m", "-"): "cividis"},
         ),
     )
-    ax.set_title("$\it{SNURF}$ differentially methylated region")
+    ax.set_title(r"$\it{SNURF}$ differentially methylated region")
     ax.set_xlim(24.953e6, 24.958e6)
     ax.set_xlabel("chr15 (Mb)")
     ax.xaxis.set_major_formatter(lv.util.base_formatter(unit="mb", fmt="{:.3f}"))

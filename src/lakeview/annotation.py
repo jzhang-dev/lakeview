@@ -5,13 +5,16 @@ from typing import (
     Optional,
     Dict,
     List,
+    Set,
     Union,
     Callable,
+    Collection,
     Iterable,
     Sequence,
     Literal,
     Tuple,
-    Mapping
+    Mapping,
+    TextIO,
 )
 from dataclasses import dataclass, field
 import warnings
@@ -30,8 +33,8 @@ class AnnotationRecord:
     start: int
     end: int
     score: Optional[float] = None
-    strand: Optional[float] = None
-    frame: Optional[int] = None
+    strand: Optional[str] = None
+    frame: Optional[str] = None
     attributes: Dict[str, str] = field(default_factory=dict)
     id: Optional[str] = None
     parent: Optional[str] = None
@@ -75,15 +78,15 @@ class GeneAnnotation:
         return attr_dict
 
     @staticmethod
-    def parse_file(
-        file_object,
-        format_: Literal["gtf", "gff", "gff3"],
+    def _parse_file(
+        file_object: TextIO,
         *,
-        features=None,
-        sequence_name=None,
-        start=None,
-        end=None,
-        assume_sorted=False,
+        format_: Literal["gtf", "gff", "gff3"],
+        features: Set[str],
+        sequence_name: Optional[str] = None,
+        start: Optional[float] = None,
+        end: Optional[float] = None,
+        assume_sorted: bool = False,
     ) -> List[AnnotationRecord]:
         # Ref: http://daler.github.io/gffutils/dialect.html
         # Ref: https://mblab.wustl.edu/GTF22.html
@@ -158,40 +161,51 @@ class GeneAnnotation:
     def from_file(
         cls,
         file_path=None,
-        file_object=None,
         *,
-        format_,
-        preset="auto",
-        sequence_name=None,
-        start=None,
-        end=None,
-        gene_features=["gene"],
-        transcript_features=["transcript", "primary_transcript"],
-        exon_features=["exon"],
-        cds_features=["CDS"],
-        transcript_key=None,
-        gene_key=None,  # Reserve for future use
-        assume_sorted=False,
+        file_object=None,
+        format_: Literal["gtf", "gff", "gff3"],
+        sequence_name: Optional[str] = None,
+        start: Optional[float] = None,
+        end: Optional[float] = None,
+        gene_features: Collection[str] = ["gene"],
+        transcript_features: Collection[str] = [
+            "transcript",
+            "primary_transcript",
+            "RNA",
+        ],
+        exon_features: Collection[str] = ["exon"],
+        cds_features: Collection[str] = ["CDS"],
+        transcript_key: str = "transcript_id",
+        gene_key: str = "",  # Reserve for future use
+        assume_sorted: bool = False,
     ):
-        preset = None if preset is None else preset.lower()
-        if transcript_key is not None and preset is not None:
-            warnings.warn(
-                f"Overriding `preset` {preset!r} with user-supplied `transcript_key={transcript_key}`. To prevent this warning, set `preset = None`."
-            )
-        features = gene_features + transcript_features + exon_features + cds_features
-        parse_kw = dict(
-            format_=format_,
-            features=features,
-            sequence_name=sequence_name,
-            start=start,
-            end=end,
-            assume_sorted=assume_sorted,
+        features: Set[str] = (
+            set(gene_features)
+            | set(transcript_features)
+            | set(exon_features)
+            | set(cds_features)
         )
         if file_path is not None and file_object is None:
             with open(file_path, "r") as f:
-                records = cls.parse_file(f, **parse_kw)
+                records = cls._parse_file(
+                    f,
+                    format_=format_,
+                    features=features,
+                    sequence_name=sequence_name,
+                    start=start,
+                    end=end,
+                    assume_sorted=assume_sorted,
+                )
         elif file_object is not None and file_path is None:
-            records = cls.parse_file(file_object, **parse_kw)
+            records = cls._parse_file(
+                file_object,
+                format_=format_,
+                features=features,
+                sequence_name=sequence_name,
+                start=start,
+                end=end,
+                assume_sorted=assume_sorted,
+            )
         else:
             raise ValueError("Either `file_path` or `file_object` must be provided.")
         if not records:
@@ -209,8 +223,6 @@ class GeneAnnotation:
                 transcripts.append(r)
             elif r.feature in exon_features or r.feature in cds_features:
                 attr_dict = r.attributes
-                if transcript_key is None:
-                    transcript_key = cls._infer_transcript_key(attr_dict, preset=preset)
                 parent = attr_dict.get(transcript_key)
                 if parent is None:
                     raise ValueError(f"Invalid `transcript_key` {transcript_key!r}.")
@@ -220,6 +232,36 @@ class GeneAnnotation:
                 else:
                     cdss.append(r)
         return cls(genes, transcripts, exons, cdss)
+
+    @classmethod
+    def from_gencode_gtf(
+        cls,
+        file_path=None,
+        *,
+        file_object=None,
+        build: Literal["GRCh38"] = "GRCh38",
+        chromosome: Optional[str] = None,
+        start: Optional[float] = None,
+        end: Optional[float] = None,
+    ):
+        sequence_name = chromosome  # TODO: check GRCh37
+        transcript_features: Collection[str] = ["transcript", "primary_transcript"]
+        exon_features: Collection[str] = ["exon"]
+        cds_features: Collection[str] = ["CDS"]
+        transcript_key: str = "transcript_id"
+        return cls.from_file(
+            file_path=file_path,
+            file_object=file_object,
+            format_="gtf",
+            sequence_name=sequence_name,
+            start=start,
+            end=end,
+            transcript_features=transcript_features,
+            exon_features=exon_features,
+            cds_features=cds_features,
+            transcript_key=transcript_key,
+        )
+        # TODO: add auto gene name parsing 
 
     @staticmethod
     def _infer_transcript_key(attr_dict, *, preset):
@@ -236,7 +278,7 @@ class GeneAnnotation:
                 raise ValueError("Failed to automatically detect `transcript_key`.")
         return transcript_key
 
-    def _parse_runtime_parameters( # TODO: delete?
+    def _parse_runtime_parameters(  # TODO: delete?
         self,
         *,
         color_by,
