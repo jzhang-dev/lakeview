@@ -10,7 +10,7 @@ from typing import (
     TextIO,
 )
 from collections.abc import Iterable, Sequence, Mapping, Container
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import warnings
 import numpy as np
 from matplotlib.collections import LineCollection
@@ -30,19 +30,52 @@ class AnnotationRecord:
     strand: Optional[str] = None
     frame: Optional[str] = None
     attributes: dict[str, str] = field(default_factory=dict)
-    id: Optional[str] = None
-    parent: Optional[str] = None
 
     def __len__(self):
         return self.end - self.start + 1
 
 
+class GeneRecord(AnnotationRecord): # TODO
+    pass
+
+
+class TranscriptRecord(AnnotationRecord):
+    transcript_id: str
+    gene_name: Optional[str]
+
+    def __init__(
+        self, *args, transcript_id: str, gene_name: Optional[str] = None, **kw
+    ):
+        super().__init__(*args, **kw)
+        self.transcript_id = transcript_id
+        self.gene_name = gene_name
+
+class ExonRecord(AnnotationRecord):
+    transcript_id: str
+
+    def __init__(
+        self, *args, transcript_id: str, **kw
+    ):
+        super().__init__(*args, **kw)
+        self.transcript_id = transcript_id
+
+
+class CdsRecord(AnnotationRecord):
+    transcript_id: str
+
+    def __init__(
+        self, *args, transcript_id: str, **kw
+    ):
+        super().__init__(*args, **kw)
+        self.transcript_id = transcript_id
+
+
 @dataclass(repr=False)
 class GeneAnnotation:
     genes: list[AnnotationRecord]
-    transcripts: list[AnnotationRecord]
-    exons: list[AnnotationRecord]
-    cdss: list[AnnotationRecord]
+    transcripts: list[TranscriptRecord]
+    exons: list[ExonRecord]
+    cdss: list[CdsRecord]
 
     @staticmethod
     def parse_attribute_string(
@@ -141,7 +174,6 @@ class GeneAnnotation:
                     attributes=attr_dict,
                 )
             )
-
         return records
 
     @classmethod
@@ -162,10 +194,10 @@ class GeneAnnotation:
         ],
         exon_features: Iterable[str] = ["exon"],
         cds_features: Iterable[str] = ["CDS"],
-        transcript_key: str = "transcript_id",
-        parent_transcript_key: str = "transcript_id",
-        gene_key: str = "gene_id",  # Reserve for future use
-        parent_gene_key: str = "gene_id",
+        transcript_key: str = "transcript_id", # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str = "transcript_id", # Fetch the parent transcript_id from a exon/CDS record
+        gene_key: str = "gene_id",  # Fetch the gene_id from a gene record. Reserved for future use
+        parent_gene_key: str = "gene_id", # Fetch the parent gene_id from a transcript record
     ):
         if file_path is None and file_object is None:
             raise ValueError("Either `file_path` or `file_object` must be provided.")
@@ -203,27 +235,31 @@ class GeneAnnotation:
             warnings.warn("No annotation records have been loaded.")
 
         genes, transcripts, exons, cdss = [], [], [], []
-        for r in records:
-            if r.feature in gene_features:
-                genes.append(r)
-            elif r.feature in transcript_features:
-                transcript_id = r.attributes.get(transcript_key)
+        for record in records:
+            if record.feature in gene_features:
+                genes.append(record)
+            elif record.feature in transcript_features:
+                transcript_id = record.attributes.get(transcript_key)
                 if transcript_id is None:
                     raise ValueError(f"Invalid `transcript_key` {transcript_key!r}.")
-                r.id = transcript_id
-                transcripts.append(r)
-            elif r.feature in exon_features or r.feature in cds_features:
-                attr_dict = r.attributes
-                parent = attr_dict.get(parent_transcript_key)
-                if parent is None:
+                transcript_record = TranscriptRecord(**asdict(record), transcript_id=transcript_id)
+                transcripts.append(transcript_record)
+            elif record.feature in exon_features:
+                transcript_id = record.attributes.get(parent_transcript_key)
+                if transcript_id is None:
                     raise ValueError(
                         f"Invalid `parent_transcript_key` {transcript_key!r}."
                     )
-                r.parent = parent
-                if r.feature in exon_features:
-                    exons.append(r)
-                else:
-                    cdss.append(r)
+                exon_record = ExonRecord(**asdict(record), transcript_id=transcript_id)
+                exons.append(exon_record)
+            elif record.feature in cds_features:
+                transcript_id = record.attributes.get(parent_transcript_key)
+                if transcript_id is None:
+                    raise ValueError(
+                        f"Invalid `parent_transcript_key` {transcript_key!r}."
+                    )
+                cds_record = CdsRecord(**asdict(record), transcript_id=transcript_id)
+                cdss.append(cds_record)
         return cls(genes, transcripts, exons, cdss)
 
     @classmethod
@@ -246,7 +282,7 @@ class GeneAnnotation:
         parent_transcript_key = "transcript_id"
         gene_key = "gene_id"
         parent_gene_key = "gene_id"
-        return cls.from_file(
+        instance = cls.from_file(
             file_path=file_path,
             file_object=file_object,
             format_="gtf",
@@ -262,7 +298,10 @@ class GeneAnnotation:
             gene_key=gene_key,
             parent_gene_key=parent_gene_key,
         )
-        # TODO: add auto gene name parsing
+        # Parse gene names
+        for transcript in instance.transcripts:
+            transcript.gene_name = transcript.attributes.get("gene_name")
+        return instance
 
     @classmethod
     def from_refseq_gff(
@@ -325,7 +364,7 @@ class GeneAnnotation:
         parent_transcript_key = "Parent"
         gene_key = "ID"
         parent_gene_key = "Parent"
-        return cls.from_file(
+        instance = cls.from_file(
             file_path=file_path,
             file_object=file_object,
             format_="gff",
@@ -341,7 +380,10 @@ class GeneAnnotation:
             gene_key=gene_key,
             parent_gene_key=parent_gene_key,
         )
-        # TODO: add auto gene name parsing
+        # Parse gene names
+        for transcript in instance.transcripts:
+            transcript.gene_name = transcript.attributes.get("gene")
+        return instance
 
     def _parse_runtime_parameters(  # TODO: delete?
         self,
@@ -449,28 +491,29 @@ class GeneAnnotation:
             Callable[[AnnotationRecord], NativeHashable],
             Iterable[NativeHashable],
             None,
-        ] = None,
+        ],
         group_by: Union[
             Callable[[AnnotationRecord], GroupIdentifier],
             Iterable[GroupIdentifier],
             None,
-        ] = None,
+        ],
         filter_by: Union[
             Callable[[AnnotationRecord], bool],
             Iterable[bool],
             None,
-        ] = None,
+        ],
         color_by: Union[
             Callable[[AnnotationRecord], Color],
             Iterable[Color],
             None,
-        ] = None,
+        ],
         label_by: Union[
             Callable[[AnnotationRecord], str],
             Iterable[str],
+            Literal["gene_name"],
             None,
-        ] = None,
-    ) -> tuple[list[AnnotationRecord], list[GroupIdentifier], list[Color], list[str]]:
+        ],
+    ) -> tuple[list[TranscriptRecord], list[GroupIdentifier], list[Color], list[str]]:
         transcripts = self.transcripts
         n_transcripts = len(transcripts)
         # Groups
@@ -495,7 +538,13 @@ class GeneAnnotation:
         labels: list[str] = []
         if label_by is None:
             labels = [""] * n_transcripts
-        if callable(label_by):
+        elif label_by == "gene_name":
+            labels = [
+                t.gene_name if t.gene_name is not None else "" for t in transcripts
+            ]
+        elif isinstance(label_by, str):
+            raise TypeError()
+        elif callable(label_by):
             labels = [label_by(t) for t in transcripts]
         elif isinstance(label_by, Iterable):
             labels = list(label_by)
@@ -525,7 +574,7 @@ class GeneAnnotation:
 
         return transcripts, groups, colors, labels
 
-    def draw_transcripts(  # TODO: mask = None for reversible subsetting
+    def draw_transcripts(
         self,
         ax: Axes,
         *,
@@ -537,7 +586,7 @@ class GeneAnnotation:
         group_by: Union[
             Callable[[AnnotationRecord], GroupIdentifier],
             Iterable[GroupIdentifier],
-            None,
+            Literal["gene_name"],
         ] = None,
         filter_by: Union[
             Callable[[AnnotationRecord], bool],
@@ -552,8 +601,9 @@ class GeneAnnotation:
         label_by: Union[
             Callable[[AnnotationRecord], str],
             Iterable[str],
+            Literal["gene_name"],
             None,
-        ] = None,
+        ] = "gene_name",
         group_labels: Union[
             Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
         ] = None,
@@ -575,7 +625,7 @@ class GeneAnnotation:
         offsets = self._get_transcript_offsets(
             transcripts, groups, max_group_offset=max_group_height - 1
         )
-        print(offsets)
+
         transcripts, colors, groups, labels, offsets = helpers.filter_by(
             transcripts, colors, groups, labels, offsets, by=[y >= 0 for y in offsets]
         )
@@ -598,14 +648,14 @@ class GeneAnnotation:
             ax, transcripts, offsets, colors=colors, **transcripts_kw
         )
 
-        offset_dict = {t.id: y for t, y in zip(transcripts, offsets)}
-        exons = [x for x in self.exons if x.parent in offset_dict]
-        cdss = [x for x in self.cdss if x.parent in offset_dict]
-        exon_offsets = [offset_dict[x.parent] for x in exons]
-        cds_offsets = [offset_dict[x.parent] for x in cdss]
-        color_dict = {t.id: c for t, c in zip(transcripts, colors)}
-        exon_colors = [color_dict[x.parent] for x in exons]
-        cds_colors = [color_dict[x.parent] for x in cdss]
+        offset_dict = {t.transcript_id: y for t, y in zip(transcripts, offsets)}
+        exons = [x for x in self.exons if x.transcript_id in offset_dict]
+        cdss = [x for x in self.cdss if x.transcript_id in offset_dict]
+        exon_offsets = [offset_dict[x.transcript_id] for x in exons]
+        cds_offsets = [offset_dict[x.transcript_id] for x in cdss]
+        color_dict = {t.transcript_id: c for t, c in zip(transcripts, colors)}
+        exon_colors = [color_dict[x.transcript_id] for x in exons]
+        cds_colors = [color_dict[x.transcript_id] for x in cdss]
 
         self._draw_exons(
             ax, exons, exon_offsets, height=height / 2, colors=exon_colors, **exons_kw

@@ -85,7 +85,7 @@ def test_IGH():
         max_group_height=50,
     )
     gencode_painter.draw_transcripts(
-        gv.axes[2], max_group_height=4, label_by=lambda t: t.attributes["gene_name"],
+        gv.axes[2], max_group_height=4,
         sort_by=lambda t: -len(t)
     )
 

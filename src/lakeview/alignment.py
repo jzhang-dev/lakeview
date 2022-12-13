@@ -310,13 +310,11 @@ class AlignedSegment:
         self.is_reverse: bool = not self.is_forward
         self.is_proper_pair: bool = wrapped.is_proper_pair
         self.is_secondary: bool = wrapped.is_secondary
+        self.is_mapped: bool = wrapped.is_mapped  # type: ignore
         self.query_alignment_length: int = wrapped.query_alignment_length
 
         if self.cigartuples is not None:
             self.cigar = CIGAR.from_aligned_segment(self)
-
-    # def __getattr__(self, name):
-    #     return getattr(self.wrapped, name)
 
     def has_tag(self, tag: str):
         return self.wrapped.has_tag(tag)
@@ -465,7 +463,6 @@ class LinkedSegment:
         return max(seg.reference_end for seg in self.segments)
 
 
-@dataclass(repr=False)
 class SequenceAlignment(TrackPainter):
     segments: list[AlignedSegment]
     pileup_depths: Optional[dict[int, int]] = None
@@ -473,10 +470,19 @@ class SequenceAlignment(TrackPainter):
     reference_name: Optional[str] = None
     reference_sequence: Optional[str] = None
 
-    def __post_init__(self):
-        self.segments = [seg for seg in self.segments if seg.wrapped.is_mapped]
-        for segment in self.segments:
-            segment.alignment = self
+    def __init__(
+        self,
+        segments: list[AlignedSegment],
+        pileup_depths: Optional[dict[int, int]] = None,
+        pileup_bases: Optional[dict[int, collections.Counter[str]]] = None,
+        reference_name: Optional[str] = None,
+        reference_sequence: Optional[str] = None,
+    ):
+        self.segments: list[AlignedSegment] = [seg for seg in segments if seg.is_mapped]
+        self.pileup_depths = pileup_depths
+        self.pileup_bases = pileup_bases
+        self.reference_name = reference_name
+        self.reference_sequence = reference_sequence
 
     @classmethod
     def from_file(
@@ -517,8 +523,7 @@ class SequenceAlignment(TrackPainter):
                     seg
                     for seg in alignment_file.fetch(
                         contig=reference_name, start=start, stop=end, region=region
-                    )
-                    if seg.reference_start is not None and seg.reference_end is not None
+                    ) if seg.is_mapped
                 ]
                 if not segment_list:
                     warnings.warn("No aligned segments loaded.")
