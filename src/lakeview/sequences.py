@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 import collections
-import random
 import math
 import itertools
 from dataclasses import dataclass
@@ -122,10 +121,11 @@ class DotPlot:
         return name, sequence
 
     @staticmethod
-    def get_canonical_kmer_indices(sequence, k, *, sample_fraction=1):
+    def get_canonical_kmer_indices(sequence, k, *, sample_fraction=1, seed=0):
+        rng = np.random.default_rng(seed=seed)
         kmer_indices = collections.defaultdict(list)
         for index, kmer in util.enumerate_kmers(sequence, k, strand="single"):
-            if sample_fraction == 1 or random.random() <= sample_fraction:
+            if sample_fraction == 1 or rng.random() <= sample_fraction:
                 canonical_kmer = util.canonicalize(kmer)
                 kmer_indices[canonical_kmer].append(index)
         return kmer_indices
