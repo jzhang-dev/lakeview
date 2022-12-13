@@ -487,32 +487,11 @@ class GeneAnnotation:
     def _parse_transcript_parameters(
         self,
         *,
-        sort_by: Union[
-            Callable[[AnnotationRecord], NativeHashable],
-            Iterable[NativeHashable],
-            None,
-        ],
-        group_by: Union[
-            Callable[[AnnotationRecord], GroupIdentifier],
-            Iterable[GroupIdentifier],
-            None,
-        ],
-        filter_by: Union[
-            Callable[[AnnotationRecord], bool],
-            Iterable[bool],
-            None,
-        ],
-        color_by: Union[
-            Callable[[AnnotationRecord], Color],
-            Iterable[Color],
-            None,
-        ],
-        label_by: Union[
-            Callable[[AnnotationRecord], str],
-            Iterable[str],
-            Literal["gene_name"],
-            None,
-        ],
+        sort_by,
+        group_by,
+        filter_by,
+        color_by,
+        label_by,
     ) -> tuple[list[TranscriptRecord], list[GroupIdentifier], list[Color], list[str]]:
         transcripts = self.transcripts
         n_transcripts = len(transcripts)
@@ -557,6 +536,8 @@ class GeneAnnotation:
                 raise ValueError()
         elif callable(filter_by):
             selection = [filter_by(t) for t in transcripts]
+        elif isinstance(filter_by, Iterable):
+            selection = list(filter_by)
         if filter_by is not None:
             transcripts, groups, labels = helpers.filter_by(
                 transcripts, groups, labels, by=selection
@@ -565,8 +546,17 @@ class GeneAnnotation:
                 warnings.warn("All segments removed after filtering.")
 
         # Sort transcripts
-        if callable(sort_by):
+        keys: list[NativeHashable] = []
+        if sort_by is None:
+            pass
+        elif sort_by == 'length':
+            keys = [-len(t) for t in transcripts]
+        elif isinstance(sort_by, str):
+            raise TypeError()
+        elif callable(sort_by):
             keys = [sort_by(t) for t in transcripts]
+        elif isinstance(sort_by, Iterable):
+            keys = list(sort_by)
         if sort_by is not None:
             transcripts, groups, labels = helpers.sort_by(
                 transcripts, groups, labels, by=keys
@@ -581,12 +571,14 @@ class GeneAnnotation:
         sort_by: Union[
             Callable[[AnnotationRecord], NativeHashable],
             Iterable[NativeHashable],
+            Literal["length"],
             None,
         ] = None,
         group_by: Union[
             Callable[[AnnotationRecord], GroupIdentifier],
             Iterable[GroupIdentifier],
             Literal["gene_name"],
+            None,
         ] = None,
         filter_by: Union[
             Callable[[AnnotationRecord], bool],

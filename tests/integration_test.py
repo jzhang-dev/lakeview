@@ -85,8 +85,7 @@ def test_IGH():
         max_group_height=50,
     )
     gencode_painter.draw_transcripts(
-        gv.axes[2], max_group_height=4,
-        sort_by=lambda t: -len(t)
+        gv.axes[2], max_group_height=4, sort_by="length"
     )
 
     gv.set_xlim((105679000, 105776000))
