@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from __future__ import annotations
 import collections
 import random
 import math
 import itertools
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional
 import numpy as np
 from Bio import SeqIO
 
@@ -18,7 +19,7 @@ Dot = collections.namedtuple("Dot", ["x", "y"])
 
 @dataclass(repr=False)
 class DotPlot:
-    dots: List[Dot]
+    dots: list[Dot]
     x_sequence_name: Optional[str] = None
     y_sequence_name: Optional[str] = None
     x_sequence_size: Optional[str] = None

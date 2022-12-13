@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from typing import Tuple, Iterable, List, Literal, Callable, Any, Sequence, Optional
+from __future__ import annotations
+from typing import Literal, Callable, Any, Optional
+from collections.abc import Iterable, Sequence
 import os
 import pathlib
 import tempfile
@@ -14,7 +16,7 @@ from .custom_types import Color, NativeHashable
 
 def get_cmap_colors(
     cmap_name: str, format_: Literal["hex", "rgb"] = "hex"
-) -> List[Color]:
+) -> list[Color]:
     """
     https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
 
@@ -41,7 +43,7 @@ def get_cmap_colors(
 
 def sort_by(
     *iterables: Sequence, by: Sequence[NativeHashable], reverse: bool = False
-) -> List[List]:
+) -> list[list]:
     """
     Sort multiple equal-length lists by the value of another list.
 
@@ -70,7 +72,7 @@ def sort_by(
     return sorted_lists
 
 
-def filter_by(*iterables: Sequence, by: Sequence[bool]) -> List[List]:
+def filter_by(*iterables: Sequence, by: Sequence[bool]) -> list[list]:
     """
     Filter multiple equal-length lists by the value of another list.
 
@@ -96,8 +98,8 @@ def filter_by(*iterables: Sequence, by: Sequence[bool]) -> List[List]:
 
 def draw_rigid_polygon(
     ax,
-    shape: Iterable[Tuple[Real, Real]],
-    position: Tuple[Real, Real],
+    shape: Iterable[tuple[Real, Real]],
+    position: tuple[Real, Real],
     position_transform: mpl.transforms.Transform,
     **kw,
 ):
@@ -151,7 +153,7 @@ def download_bam(
         pysam.index(output_bam_path, output_bai_path)  # type: ignore
 
 
-def pack_intervals(intervals: Iterable[Tuple[float, float]]) -> List[int]:
+def pack_intervals(intervals: Iterable[tuple[float, float]]) -> list[int]:
     """
     Assign an non-negative offset to each input interval so that intervals sharing the same offset will not overlap with each other, while minimising offset values.
     Intervals are treated as being closed.
@@ -159,7 +161,7 @@ def pack_intervals(intervals: Iterable[Tuple[float, float]]) -> List[int]:
     >>> pack_intervals([(1, 2), (3, 4), (1, 3), (0, 5)])
     [0, 0, 1, 2]
     """
-    occupied_intervals: List[List[Tuple[float, float]]] = [[]]
+    occupied_intervals: list[list[tuple[float, float]]] = [[]]
     offsets = []
     for (start, end) in intervals:
         for offset, intervals in enumerate(occupied_intervals):

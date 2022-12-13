@@ -1,21 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from __future__ import annotations
 from typing import (
     Optional,
-    Dict,
-    List,
-    Set,
     Union,
     Callable,
-    Collection,
-    Iterable,
-    Sequence,
     Literal,
-    Tuple,
-    Mapping,
     TextIO,
 )
+from collections.abc import Iterable, Sequence, Mapping, Container
 from dataclasses import dataclass, field
 import warnings
 import numpy as np
@@ -35,7 +29,7 @@ class AnnotationRecord:
     score: Optional[float] = None
     strand: Optional[str] = None
     frame: Optional[str] = None
-    attributes: Dict[str, str] = field(default_factory=dict)
+    attributes: dict[str, str] = field(default_factory=dict)
     id: Optional[str] = None
     parent: Optional[str] = None
 
@@ -45,10 +39,10 @@ class AnnotationRecord:
 
 @dataclass(repr=False)
 class GeneAnnotation:
-    genes: List[AnnotationRecord]
-    transcripts: List[AnnotationRecord]
-    exons: List[AnnotationRecord]
-    cdss: List[AnnotationRecord]
+    genes: list[AnnotationRecord]
+    transcripts: list[AnnotationRecord]
+    exons: list[AnnotationRecord]
+    cdss: list[AnnotationRecord]
 
     @staticmethod
     def parse_attribute_string(
@@ -82,11 +76,11 @@ class GeneAnnotation:
         file_object: TextIO,
         *,
         format_: Literal["gtf", "gff", "gff3"],
-        features: Set[str],
+        features: Container[str],
         sequence_name: Optional[str] = None,
         start: Optional[float] = None,
         end: Optional[float] = None,
-    ) -> List[AnnotationRecord]:
+    ) -> list[AnnotationRecord]:
         # Ref: http://daler.github.io/gffutils/dialect.html
         # Ref: https://mblab.wustl.edu/GTF22.html
         # Ref: https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
@@ -111,7 +105,7 @@ class GeneAnnotation:
         else:
             raise ValueError("Only GTF and GFF3 formats are supported.")
 
-        records: List[AnnotationRecord] = []
+        records: list[AnnotationRecord] = []
         for line in file_object:
             if line.startswith("#"):
                 continue
@@ -153,21 +147,21 @@ class GeneAnnotation:
     @classmethod
     def from_file(
         cls,
-        file_path:Optional[str]=None,
+        file_path: Optional[str] = None,
         *,
-        file_object:Optional[TextIO]=None,
+        file_object: Optional[TextIO] = None,
         format_: Literal["gtf", "gff", "gff3"],
         sequence_name: Optional[str] = None,
         start: Optional[float] = None,
         end: Optional[float] = None,
-        gene_features: Collection[str] = ["gene"],
-        transcript_features: Collection[str] = [
+        gene_features: Iterable[str] = ["gene"],
+        transcript_features: Iterable[str] = [
             "transcript",
             "primary_transcript",
             "RNA",
         ],
-        exon_features: Collection[str] = ["exon"],
-        cds_features: Collection[str] = ["CDS"],
+        exon_features: Iterable[str] = ["exon"],
+        cds_features: Iterable[str] = ["CDS"],
         transcript_key: str = "transcript_id",
         parent_transcript_key: str = "transcript_id",
         gene_key: str = "gene_id",  # Reserve for future use
@@ -179,7 +173,7 @@ class GeneAnnotation:
             raise ValueError(
                 "Only one of `file_path` or `file_object` can be provided."
             )
-        features: Set[str] = (
+        features: set[str] = (
             set(gene_features)
             | set(transcript_features)
             | set(exon_features)
@@ -222,7 +216,9 @@ class GeneAnnotation:
                 attr_dict = r.attributes
                 parent = attr_dict.get(parent_transcript_key)
                 if parent is None:
-                    raise ValueError(f"Invalid `parent_transcript_key` {transcript_key!r}.")
+                    raise ValueError(
+                        f"Invalid `parent_transcript_key` {transcript_key!r}."
+                    )
                 r.parent = parent
                 if r.feature in exon_features:
                     exons.append(r)
@@ -247,9 +243,9 @@ class GeneAnnotation:
         exon_features = ["exon"]
         cds_features = ["CDS"]
         transcript_key = "transcript_id"
-        parent_transcript_key= "transcript_id"
+        parent_transcript_key = "transcript_id"
         gene_key = "gene_id"
-        parent_gene_key="gene_id"
+        parent_gene_key = "gene_id"
         return cls.from_file(
             file_path=file_path,
             file_object=file_object,
@@ -278,7 +274,7 @@ class GeneAnnotation:
         start: Optional[float] = None,
         end: Optional[float] = None,
     ):
-        chromosome_dict: Dict[str, Dict[str, str]] = dict(
+        chromosome_dict: dict[str, dict[str, str]] = dict(
             GRCh37=dict(
                 chr1="NC_000001.10",
                 chr2="NC_000002.11",
@@ -325,9 +321,9 @@ class GeneAnnotation:
         exon_features = ["exon"]
         cds_features = ["CDS"]
         transcript_key = "ID"
-        parent_transcript_key= "Parent"
+        parent_transcript_key = "Parent"
         gene_key = "ID"
-        parent_gene_key="Parent"
+        parent_gene_key = "Parent"
         return cls.from_file(
             file_path=file_path,
             file_object=file_object,
@@ -432,7 +428,7 @@ class GeneAnnotation:
         return np.array(helpers.pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
-    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> List[int]:
+    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> list[int]:
         offsets = np.zeros(len(transcripts))
         y = 0
         for group in list(sorted(set(groups))):
@@ -472,11 +468,11 @@ class GeneAnnotation:
             Iterable[str],
             None,
         ] = None,
-    ) -> Tuple[List[AnnotationRecord], List[GroupIdentifier], List[Color], List[str]]:
+    ) -> tuple[list[AnnotationRecord], list[GroupIdentifier], list[Color], list[str]]:
         transcripts = self.transcripts
         n_transcripts = len(transcripts)
         # Groups
-        groups: List[GroupIdentifier] = []
+        groups: list[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_transcripts
         elif callable(group_by):
@@ -485,7 +481,7 @@ class GeneAnnotation:
             groups = list(group_by)
 
         # Colors
-        colors: List[Color] = []
+        colors: list[Color] = []
         if color_by is None:
             colors = ["b"] * n_transcripts
         elif callable(color_by):
@@ -494,7 +490,7 @@ class GeneAnnotation:
             colors = list(color_by)
 
         # Labels
-        labels: List[str] = []
+        labels: list[str] = []
         if label_by is None:
             labels = [""] * n_transcripts
         if callable(label_by):
@@ -503,7 +499,7 @@ class GeneAnnotation:
             labels = list(label_by)
 
         # Filter transcripts
-        selection: List[bool] = []
+        selection: list[bool] = []
         if isinstance(filter_by, Iterable):
             selection = list(filter_by)
             if len(selection) != n_transcripts:
