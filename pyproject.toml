@@ -21,6 +21,3 @@ dependencies = [
     "matplotlib",
     "pysam",
 ]
-
-[pytest]
-testpaths = ["tests"]

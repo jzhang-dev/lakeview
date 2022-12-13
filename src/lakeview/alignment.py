@@ -21,11 +21,13 @@ import functools
 import itertools
 import numpy as np
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.collections import LineCollection
 import pysam
 
-from . import helpers
+from .helpers import filter_by_keys, sort_by_keys, pack_intervals
+from .plot import get_ax_size, get_random_colors
 from .custom_types import (
     NativeHashable,
     GroupIdentifier,
@@ -38,10 +40,10 @@ from .custom_types import (
     Line,
 )
 
-# TODO: label metadata
-# Ref skips
-# Get query sequence by position
-# Max depth marker
+
+
+# TODO: Get query sequence by position
+# TODO: Max depth marker
 
 
 class TrackPainter:
@@ -194,8 +196,8 @@ class CIGAR:
     insertions: list[Insertion]
     deletions: list[Deletion]
     reference_skips: list[ReferenceSkip]
-    soft_clipping: list[SoftClippedBases]
-    hard_clipping: list[HardClippedBases]
+    soft_clippings: list[SoftClippedBases]
+    hard_clippings: list[HardClippedBases]
     mismatched_bases: list[CigarMismatchedBase]
 
     @classmethod
@@ -207,8 +209,8 @@ class CIGAR:
         insertions = []
         deletions = []
         reference_skips = []
-        soft_clipping = []
-        hard_clipping = []
+        soft_clippings = []
+        hard_clippings = []
         mismatched_bases = []
         ref_offset = 0
         qry_offset = 0
@@ -239,13 +241,13 @@ class CIGAR:
                     )
                 )
             elif operation == 4:  # Soft clipping
-                soft_clipping.append(
+                soft_clippings.append(
                     SoftClippedBases(
                         segment=segment, reference_offset=ref_offset, size=length
                     )
                 )
             elif operation == 5:  # Hard clipping
-                hard_clipping.append(
+                hard_clippings.append(
                     HardClippedBases(
                         segment=segment,
                         size=length,
@@ -285,8 +287,8 @@ class CIGAR:
             deletions=deletions,
             reference_skips=reference_skips,
             mismatched_bases=mismatched_bases,
-            soft_clipping=soft_clipping,
-            hard_clipping=hard_clipping,
+            soft_clippings=soft_clippings,
+            hard_clippings=hard_clippings,
         )
 
 
@@ -381,11 +383,11 @@ class AlignedSegment:
 
     @property
     def soft_clipping(self):
-        return self.cigar.soft_clipping
+        return self.cigar.soft_clippings
 
     @property
     def hard_clipping(self):
-        return self.cigar.hard_clipping
+        return self.cigar.hard_clippings
 
     def _get_md_mismatched_bases(self) -> list[MdMismatchedBase]:
         query_sequence = self.query_sequence
@@ -523,7 +525,8 @@ class SequenceAlignment(TrackPainter):
                     seg
                     for seg in alignment_file.fetch(
                         contig=reference_name, start=start, stop=end, region=region
-                    ) if seg.is_mapped
+                    )
+                    if seg.is_mapped
                 ]
                 if not segment_list:
                     warnings.warn("No aligned segments loaded.")
@@ -593,7 +596,7 @@ class SequenceAlignment(TrackPainter):
             intervals.append((ls.reference_start - padding, ls.reference_end + padding))
         link_offset_dict = {
             link: offset
-            for link, offset in zip(link_ls_dict, helpers.pack_intervals(intervals))
+            for link, offset in zip(link_ls_dict, pack_intervals(intervals))
         }
         # Retrive offset for each individual segment
         segment_offsets = np.array(
@@ -610,9 +613,15 @@ class SequenceAlignment(TrackPainter):
         max_group_offset: float,
         min_spacing: float,
     ) -> list[int]:
-        if not len(segments) == len(links) == len(groups):
-            raise ValueError
-        # TODO: check no segments from differenct groups are linked together
+        # Check each LinkIdentifier only mpas to one GroupIdentifier.
+        link_group_dict: dict[LinkIdentifier, GroupIdentifier] = {}
+        for link, group in zip(links, groups):
+            recorded_group = link_group_dict.get(link, None)
+            if recorded_group is not None and recorded_group != group:
+                raise ValueError(
+                    f"LinkIdentifier {link!r} maps to multiple GroupIdentifier values. Expecting each LinkIdentifier values maps to only one GroupIdentifier value."
+                )
+
         offsets = np.zeros(len(segments))
         y = 0
         for group in list(sorted(set(groups))):
@@ -630,36 +639,11 @@ class SequenceAlignment(TrackPainter):
     def _parse_segment_parameters(
         self,
         *,
-        sort_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
-            Literal["start", "length"],
-            None,
-        ],
-        link_by: Union[
-            Callable[[AlignedSegment], LinkIdentifier],
-            Iterable[LinkIdentifier],
-            str,
-            None,
-        ],
-        group_by: Union[
-            Callable[[AlignedSegment], GroupIdentifier],
-            Iterable[GroupIdentifier],
-            Literal["haplotype", "proper_pair", "strand"],
-            None,
-        ],
-        filter_by: Union[
-            Callable[[AlignedSegment], bool],
-            Iterable[bool],
-            str,
-            None,
-        ],
-        color_by: Union[
-            Callable[[AlignedSegment], Color],  # TODO: define a color type
-            Iterable[Color],
-            str,
-            None,
-        ],
+        sort_by,
+        link_by,
+        group_by,
+        filter_by,
+        color_by,
     ) -> tuple[
         list[AlignedSegment],
         list[LinkIdentifier],
@@ -676,15 +660,20 @@ class SequenceAlignment(TrackPainter):
         colors: list[Color] = []
         if color_by is None:
             colors = ["lightgray"] * n_segments
+        elif color_by == "proper_pair":
+            colors = [
+                "lightgray" if segment.is_proper_pair else "firebrick"
+                for segment in segments
+            ]
         elif color_by == "random":
-            colors = ["lightgray"] * n_segments  # TODO: random colors
+            colors = get_random_colors(n_segments)
         elif color_by == "strand":
             colors = list(
                 map(
                     lambda segment: "lightgray" if segment.is_forward else "darkgray",
                     segments,
                 )
-            )  # TODO: better colors
+            )
         elif isinstance(color_by, str):
             raise ValueError()
         elif isinstance(color_by, Iterable):
@@ -746,8 +735,8 @@ class SequenceAlignment(TrackPainter):
         elif callable(filter_by):
             selection = [filter_by(seg) for seg in segments]
         if filter_by is not None:
-            segments, colors, links, groups = helpers.filter_by(
-                segments, colors, links, groups, by=selection
+            segments, colors, links, groups = filter_by_keys(
+                segments, colors, links, groups, keys=selection
             )
             if not segments:
                 warnings.warn("All segments removed after filtering.")
@@ -767,8 +756,8 @@ class SequenceAlignment(TrackPainter):
         elif callable(sort_by):
             keys = [sort_by(seg) for seg in segments]
         if sort_by is not None:
-            segments, colors, links, groups = helpers.sort_by(
-                segments, colors, links, groups, by=keys
+            segments, colors, links, groups = sort_by_keys(
+                segments, colors, links, groups, keys=keys
             )
 
         return segments, links, groups, colors
@@ -776,7 +765,7 @@ class SequenceAlignment(TrackPainter):
     def _get_default_segment_height(
         self, ax: Axes, offsets, *, min_height=2, max_height=10
     ) -> float:
-        _, ax_height = helpers.get_ax_size(ax)
+        _, ax_height = get_ax_size(ax)
         height = max(
             min_height,
             ax_height / (max(offsets) - min(offsets) + 2) * 0.9 * 72,
@@ -796,13 +785,13 @@ class SequenceAlignment(TrackPainter):
         sort_by: Union[
             Callable[[AlignedSegment], NativeHashable],
             Iterable[NativeHashable],
-            Literal["start", "length"],
+            Literal["length", "start"],
             None,
         ] = None,
         link_by: Union[
             Callable[[AlignedSegment], LinkIdentifier],
             Iterable[LinkIdentifier],
-            Literal["pair", "name"],
+            Literal["name", "pair"],  # TODO: link by pair
             None,
         ] = None,
         group_by: Union[
@@ -820,7 +809,7 @@ class SequenceAlignment(TrackPainter):
         color_by: Union[
             Callable[[AlignedSegment], Color],
             Iterable[Color],
-            str,
+            Literal["proper_pair", "random", "strand"],
             None,
         ] = None,
         group_labels: Union[
@@ -828,24 +817,23 @@ class SequenceAlignment(TrackPainter):
         ] = None,
         height: Optional[float] = None,
         min_spacing: Optional[float] = None,
-        show_backbones=True,
-        show_arrowheads=True,
-        show_links=True,
-        show_insertions=True,
-        min_insertion_size=10,
-        show_deletions=True,
-        min_deletion_size=10,
-        show_mismatches=True,  # TODO: show_mismatches=None -> draw if available
-        show_modified_bases=False,
-        show_soft_clipping=True,
-        min_soft_clipping_size=10,
-        show_hard_clipping=True,
-        min_hard_clipping_size=10,
+        show_backbones: bool = True,
+        show_arrowheads: bool = True,
+        show_links: bool = True,
+        show_insertions: bool = True,
+        min_insertion_size: float = 10,
+        show_deletions: bool = True,
+        min_deletion_size: float = 10,
+        show_mismatches: bool = True,
+        show_modified_bases: bool = False,
+        show_soft_clippings: bool = True,
+        min_soft_clipping_size: float = 10,
+        show_hard_clippings: bool = True,
+        min_hard_clipping_size: float = 10,
         show_reference_skips: bool = True,
-        show_letters=False,  # TODO
         show_group_labels: Optional[bool] = None,
-        show_group_separators=None,
-        max_group_height=1000,
+        show_group_separators: bool = None,
+        max_group_height: float = 1000,
         backbones_kw={},
         arrowheads_kw={},
         links_kw={},
@@ -857,7 +845,7 @@ class SequenceAlignment(TrackPainter):
         hard_clipping_kw={},
         reference_skips_kw={},
         letters_kw={},
-        group_labels_kw={},  # TODO
+        group_labels_kw={},
         group_separators_kw={},
     ):
         """
@@ -892,8 +880,8 @@ class SequenceAlignment(TrackPainter):
         )
 
         # Remove segments exceeding `max_group_offset`
-        segments, links, groups, offsets, colors = helpers.filter_by(
-            segments, links, groups, offsets, colors, by=[y >= 0 for y in offsets]
+        segments, links, groups, offsets, colors = filter_by_keys(
+            segments, links, groups, offsets, colors, keys=[y >= 0 for y in offsets]
         )
 
         # Get segment height
@@ -964,23 +952,25 @@ class SequenceAlignment(TrackPainter):
             )
         if show_reference_skips:
             self._draw_reference_skips(ax, segments, offsets, **reference_skips_kw)
-        if show_soft_clipping:
-            self._draw_soft_clipping(
+        if show_soft_clippings:
+            self._draw_clippings(
                 ax,
                 segments,
                 offsets,
+                operation='soft', 
                 height=height,
-                min_soft_clipping_size=min_soft_clipping_size,
+                min_clipping_size=min_soft_clipping_size,
                 show_arrowheads=show_arrowheads,
                 **soft_clipping_kw,
             )
-        if show_hard_clipping:
-            self._draw_hard_clipping(
+        if show_hard_clippings:
+            self._draw_clippings(
                 ax,
                 segments,
                 offsets,
+                operation='hard', 
                 height=height,
-                min_hard_clipping_size=min_hard_clipping_size,
+                min_clipping_size=min_hard_clipping_size,
                 show_arrowheads=show_arrowheads,
                 **hard_clipping_kw,
             )
@@ -1376,31 +1366,38 @@ class SequenceAlignment(TrackPainter):
             )
         )
 
-    def _draw_soft_clipping(
+    def _draw_clippings(
         self,
         ax,
         segments,
         offsets,
         height,
         *,
-        min_soft_clipping_size,
-        show_arrowheads=True,
+        operation: Literal["hard", "soft"],
+        min_clipping_size: float,
+        show_arrowheads: bool,
         linewidth=1.5,
-        color="deeppink",
+        color: Color="deeppink",
+        **kw,
     ):
         xs = []
         ys = []
         tail_marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
         fwd_head_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True)
         rev_head_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True)
-        # TODO: change the marker if show_arrowheads=False
 
         # Group clipping by type
         xs_dict: dict[str, list[float]] = collections.defaultdict(list)
         ys_dict: dict[str, list[float]] = collections.defaultdict(list)
         for seg, y in zip(segments, offsets):
-            for clip in seg.soft_clipping:
-                if clip.size >= min_soft_clipping_size:
+            if operation == "soft":
+                clippings = seg.soft_clipping
+            elif operation == "hard":
+                clippings = seg.soft_clipping
+            else:
+                raise TypeError(f"Got {operation=}, expecting Literal['hard', 'soft']")
+            for clip in clippings:
+                if clip.size >= min_clipping_size:
                     start_offset = abs(seg.reference_start - clip.reference_position)
                     end_offset = abs(seg.reference_end - clip.reference_position)
                     if start_offset < end_offset:
@@ -1415,83 +1412,29 @@ class SequenceAlignment(TrackPainter):
                             clip_type = "rev_tail"
                     xs_dict[clip_type].append(clip.reference_position - 0.5)
                     ys_dict[clip_type].append(y)
+        # Draw clippings
         for clip_type in set(xs_dict):
             xs = xs_dict[clip_type]
             ys = ys_dict[clip_type]
-            marker = dict(
-                fwd_head=fwd_head_marker,
-                fwd_tail=tail_marker,
-                rev_head=rev_head_marker,
-                rev_tail=tail_marker,
-            )[clip_type]
+            if show_arrowheads:
+                marker = dict(
+                    fwd_head=fwd_head_marker,
+                    fwd_tail=tail_marker,
+                    rev_head=rev_head_marker,
+                    rev_tail=tail_marker,
+                )[clip_type]
+            else:
+                marker = tail_marker
             ax.plot(
                 xs,
                 ys,
-                marker=marker if show_arrowheads else tail_marker,
+                marker=marker,
                 markersize=height,
                 markeredgecolor=color,
                 markerfacecolor="none",
                 markeredgewidth=linewidth,
                 ls="",
-            )
-
-    def _draw_hard_clipping(
-        self,
-        ax,
-        segments,
-        offsets,
-        height,
-        *,
-        min_hard_clipping_size,
-        show_arrowheads=True,
-        linewidth=1.5,
-        color="deeppink",
-    ):
-        xs = []
-        ys = []
-        tail_marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
-        fwd_head_marker = Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True)
-        rev_head_marker = Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True)
-
-        # Group clipping by type
-        xs_dict: dict[str, list[float]] = collections.defaultdict(list)
-        ys_dict: dict[str, list[float]] = collections.defaultdict(list)
-        for seg, y in zip(segments, offsets):
-            for clip in seg.hard_clipping:
-                if clip.size >= min_hard_clipping_size:
-                    start_offset = abs(seg.reference_start - clip.reference_position)
-                    end_offset = abs(seg.reference_end - clip.reference_position)
-                    if start_offset < end_offset:
-                        if seg.is_forward:
-                            clip_type = "fwd_tail"
-                        else:
-                            clip_type = "rev_head"
-                    else:
-                        if seg.is_forward:
-                            clip_type = "fwd_head"
-                        else:
-                            clip_type = "rev_tail"
-
-                    xs_dict[clip_type].append(clip.reference_position - 0.5)
-                    ys_dict[clip_type].append(y)
-        for clip_type in set(xs_dict):
-            xs = xs_dict[clip_type]
-            ys = ys_dict[clip_type]
-            marker = dict(
-                fwd_head=fwd_head_marker,
-                fwd_tail=tail_marker,
-                rev_head=rev_head_marker,
-                rev_tail=tail_marker,
-            )[clip_type]
-            ax.plot(
-                xs,
-                ys,
-                marker=marker if show_arrowheads else tail_marker,
-                markersize=height,
-                markeredgecolor=color,
-                markerfacecolor="none",
-                markeredgewidth=linewidth,
-                ls="",
+                **kw,
             )
 
     @functools.cached_property
@@ -1512,7 +1455,7 @@ class SequenceAlignment(TrackPainter):
         ax: Axes,
         *,
         color: Color = "lightgray",
-        show_mismatches: bool = True,  # TODO: show_mismatches=None -> draw if available
+        show_mismatches: bool = True,
         min_alt_frequency: float = 0.2,
         min_alt_depth: float = 2,
         mismatch_kw={},

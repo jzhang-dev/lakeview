@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import os, gzip
 import pytest
 import matplotlib.pyplot as plt
@@ -18,7 +21,7 @@ def test_SKBR3():
     illumina_painter.draw_pileup(gv.axes[0])
     illumina_painter.draw_alignment(
         gv.axes[1],
-        color_by=lambda segment: "lightgray" if segment.is_proper_pair else "firebrick",
+        color_by="proper_pair",
         group_by="strand",
         max_group_height=30,
     )
@@ -112,7 +115,8 @@ def test_GAPDH_RNAseq():
     alignment_painter.draw_alignment(
         gv.axes[1],
         show_arrowheads=False,
-        show_soft_clipping=False,
+        show_soft_clippings=False,
+        show_hard_clippings=False,
         show_mismatches=True,
         max_group_height=50,
         show_group_labels=False,

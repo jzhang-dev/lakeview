@@ -6,6 +6,6 @@ __email__ = "jzhang@well.ox.ac.uk"
 
 from .alignment import AlignedSegment, SequenceAlignment
 from .annotation import GeneAnnotation
-from .sequences import DotPlot
+from .sequence import DotPlot
 from .widget import GenomeViewer
 from . import util, helpers

@@ -14,43 +14,16 @@ import pysam
 from .custom_types import Color, NativeHashable
 
 
-def get_cmap_colors(
-    cmap_name: str, format_: Literal["hex", "rgb"] = "hex"
-) -> list[Color]:
-    """
-    https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
-
-    >>> get_cmap_colors("Set2")
-    ['#66c2a5',
-     '#fc8d62',
-     '#8da0cb',
-     '#e78ac3',
-     '#a6d854',
-     '#ffd92f',
-     '#e5c494',
-     '#b3b3b3']
-    """
-    cmap = mpl.colormaps.get_cmap(cmap_name, 256)
-    colors = list({cmap(i)[:3]: None for i in range(cmap.N)})
-    if format_ == "rgb":
-        pass
-    elif format_ == "hex":
-        colors = [rgb2hex(c) for c in colors]
-    else:
-        raise ValueError("`format_` must be one of {'rgb', 'hex'}")
-    return colors
-
-
-def sort_by(
-    *iterables: Sequence, by: Sequence[NativeHashable], reverse: bool = False
+def sort_by_keys(
+    *iterables: Sequence, keys: Sequence[NativeHashable], reverse: bool = False
 ) -> list[list]:
     """
-    Sort multiple equal-length lists by the value of another list.
+    Sort multiple equal-length sequences by the value of another sequences.
 
     >>> a = ['a', 'b', 'c']
     >>> b = ['x', 'y', 'z']
     >>> r = [3, 1, 2]
-    >>> sort_by(a, b, by=r, reverse=False)
+    >>> sort_by_keys(a, b, keys=r, reverse=False)
     [('b', 'c', 'a'), ('y', 'z', 'x')]
     """
     # Check iterable lengths are equal
@@ -60,26 +33,26 @@ def sort_by(
     # Return early if iterables are empty
     if any(l == 0 for l in lengths):
         return [[] for x in iterables]
-    
+
     zipped_lists = list(zip(*iterables))
     sorted_zipped_lists = [
         x
         for (_, x) in sorted(
-            zip(by, zipped_lists), key=lambda pair: pair[0], reverse=reverse
+            zip(keys, zipped_lists), key=lambda pair: pair[0], reverse=reverse
         )
     ]
     sorted_lists = list(zip(*sorted_zipped_lists))
     return sorted_lists
 
 
-def filter_by(*iterables: Sequence, by: Sequence[bool]) -> list[list]:
+def filter_by_keys(*iterables: Sequence, keys: Sequence[bool]) -> list[list]:
     """
     Filter multiple equal-length lists by the value of another list.
 
     >>> a = ['a', 'b', 'c']
     >>> b = ['x', 'y', 'z']
     >>> f = [True, False, True]
-    >>> filter_by(a, b, by=f)
+    >>> filter_by_keys(a, b, keys=f)
     [('a', 'c'), ('x', 'z')]
     """
     # Check iterable lengths are equal
@@ -91,36 +64,9 @@ def filter_by(*iterables: Sequence, by: Sequence[bool]) -> list[list]:
         return [[] for x in iterables]
 
     zipped_lists = list(zip(*iterables))
-    filtered_zipped_lists = [x for (x, b) in zip(zipped_lists, by) if b]
+    filtered_zipped_lists = [x for (x, b) in zip(zipped_lists, keys) if b]
     filtered_lists = list(zip(*filtered_zipped_lists))
     return filtered_lists
-
-
-def draw_rigid_polygon(
-    ax,
-    shape: Iterable[tuple[Real, Real]],
-    position: tuple[Real, Real],
-    position_transform: mpl.transforms.Transform,
-    **kw,
-):
-    """
-    Draw a polygon patch with shape defined in inches and position defined in data, Axes or physical units.
-    """
-    if (
-        len(position) != 2
-        or not isinstance(position[0], Real)
-        or not isinstance(position[1], Real)
-    ):
-        raise ValueError(f"position={position}")
-    transform = ax.figure.dpi_scale_trans + mpl.transforms.ScaledTranslation(
-        *position, position_transform
-    )
-    polygon = mpl.patches.Polygon(
-        shape,
-        transform=transform,
-        **kw,
-    )
-    ax.add_patch(polygon)
 
 
 def download_bam(
@@ -183,34 +129,3 @@ def pack_intervals(intervals: Iterable[tuple[float, float]]) -> list[int]:
             occupied_intervals.append([(start, end)])
             offsets.append(offset + 1)
     return offsets
-
-
-def get_ax_size(ax):
-    """
-    Return the size of a given Axes in inches.
-    """
-    fig = ax.figure
-    bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    width, height = bbox.width, bbox.height
-    return (width, height)
-
-
-def scientific_notation(
-    x: float, significant_figures: int = 3, *, quote: str = "$"
-) -> str:
-    """
-    >>> scientific_notation(0.000000013923, 4)
-    '$1.392\\times 10^{-8}$'
-    """
-    if significant_figures < 1:
-        raise ValueError()
-    if not isinstance(significant_figures, int):
-        raise ValueError()
-    float_digits = significant_figures - 1
-    # Python native scientific notation
-    coefficient, exponent = format(x, f".{float_digits}e").split("e")
-    # Remove leading zeros
-    exponent = str(int(exponent))
-    # Format with mathtext
-    s = quote + coefficient + r"\times 10^" + "{" + exponent + "}" + quote
-    return s

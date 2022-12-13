@@ -15,7 +15,8 @@ import warnings
 import numpy as np
 from matplotlib.collections import LineCollection
 
-from . import helpers
+from .helpers import filter_by_keys, sort_by_keys, pack_intervals
+from .plot import get_ax_size
 from .custom_types import GroupIdentifier, Color, Axes, NativeHashable
 
 
@@ -436,7 +437,7 @@ class GeneAnnotation:
         if allow_overlaps:
             offsets = [0] * len(genes)
         else:
-            offsets = helpers.pack_intervals(intervals)
+            offsets = pack_intervals(intervals)
         colors, labels = self._parse_runtime_parameters(
             color_by=color_by, label_by=label_by
         )
@@ -469,7 +470,7 @@ class GeneAnnotation:
     @staticmethod
     def _pack_transcripts(transcripts: Sequence[AnnotationRecord]) -> np.ndarray:
         intervals = [(t.start, t.end) for t in transcripts]
-        return np.array(helpers.pack_intervals(intervals), dtype=np.float32)
+        return np.array(pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
     def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> list[int]:
@@ -539,8 +540,8 @@ class GeneAnnotation:
         elif isinstance(filter_by, Iterable):
             selection = list(filter_by)
         if filter_by is not None:
-            transcripts, groups, labels = helpers.filter_by(
-                transcripts, groups, labels, by=selection
+            transcripts, groups, labels = filter_by_keys(
+                transcripts, groups, labels, keys=selection
             )
             if not transcripts:
                 warnings.warn("All segments removed after filtering.")
@@ -558,8 +559,8 @@ class GeneAnnotation:
         elif isinstance(sort_by, Iterable):
             keys = list(sort_by)
         if sort_by is not None:
-            transcripts, groups, labels = helpers.sort_by(
-                transcripts, groups, labels, by=keys
+            transcripts, groups, labels = sort_by_keys(
+                transcripts, groups, labels, keys=keys
             )
 
         return transcripts, groups, colors, labels
@@ -618,12 +619,12 @@ class GeneAnnotation:
             transcripts, groups, max_group_offset=max_group_height - 1
         )
 
-        transcripts, colors, groups, labels, offsets = helpers.filter_by(
-            transcripts, colors, groups, labels, offsets, by=[y >= 0 for y in offsets]
+        transcripts, colors, groups, labels, offsets = filter_by_keys(
+            transcripts, colors, groups, labels, offsets, keys=[y >= 0 for y in offsets]
         )
 
         if height is None:
-            _, ax_height = helpers.get_ax_size(ax)
+            _, ax_height = get_ax_size(ax)
             height = max(
                 3,
                 ax_height / (max(offsets) - min(offsets) + 2) * 0.5 * 72,

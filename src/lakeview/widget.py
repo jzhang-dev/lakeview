@@ -11,7 +11,6 @@ import ipywidgets
 # TODO: more buttons; auto x tick labels; prevent fig resizing
 # TODO: fix first display problem; smart scrolling / resizing; show certain artists only when zooming in;
 # TODO: Fix interactivity; JS error
-# TODO: soft clips should display as lines when not showing arrows
 
 
 class GenomeViewer:
