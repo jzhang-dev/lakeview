@@ -27,7 +27,7 @@ from matplotlib.collections import LineCollection
 import pysam
 
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
-from .plot import get_ax_size, get_random_colors
+from .plot import get_ax_size
 from .custom_types import (
     NativeHashable,
     GroupIdentifier,
@@ -665,8 +665,6 @@ class SequenceAlignment(TrackPainter):
                 "lightgray" if segment.is_proper_pair else "firebrick"
                 for segment in segments
             ]
-        elif color_by == "random":
-            colors = get_random_colors(n_segments)
         elif color_by == "strand":
             colors = list(
                 map(
@@ -809,7 +807,7 @@ class SequenceAlignment(TrackPainter):
         color_by: Union[
             Callable[[AlignedSegment], Color],
             Iterable[Color],
-            Literal["proper_pair", "random", "strand"],
+            Literal["proper_pair", "strand"],
             None,
         ] = None,
         group_labels: Union[
