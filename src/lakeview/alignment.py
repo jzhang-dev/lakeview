@@ -467,16 +467,16 @@ class LinkedSegment:
 
 class SequenceAlignment(TrackPainter):
     segments: list[AlignedSegment]
-    pileup_depths: Optional[dict[int, int]] = None
-    pileup_bases: Optional[dict[int, collections.Counter[str]]] = None
+    pileup_depths: dict[int, int]
+    pileup_bases: dict[int, collections.Counter[str]]
     reference_name: Optional[str] = None
     reference_sequence: Optional[str] = None
 
     def __init__(
         self,
         segments: list[AlignedSegment],
-        pileup_depths: Optional[dict[int, int]] = None,
-        pileup_bases: Optional[dict[int, collections.Counter[str]]] = None,
+        pileup_depths:dict[int, int],
+        pileup_bases: dict[int, collections.Counter[str]],
         reference_name: Optional[str] = None,
         reference_sequence: Optional[str] = None,
     ):
@@ -499,68 +499,55 @@ class SequenceAlignment(TrackPainter):
         *,
         region: Optional[str] = None,
         reference_sequence: Optional[str] = None,
-        load_alignment: bool = True,
-        load_pileup: bool = True,
-        check_sq: bool = True,
-        **alignment_file_kw,
+        **kw,
     ) -> SequenceAlignment:
-        if not load_alignment and not load_pileup:
-            raise ValueError("`load_alignment` and `load_pileup` cannot both be False.")
         with pysam.AlignmentFile(
-            file_path, mode, check_sq=check_sq, **alignment_file_kw
+            file_path, mode, **kw
         ) as alignment_file:
             # Check reference_name
-            reference_name_tuple = alignment_file.references
+            reference_names: tuple[str, ...] = alignment_file.references
             if start is not None or end is not None:
-                if reference_name is None:
-                    if len(reference_name_tuple) == 1:
-                        reference_name = reference_name_tuple[0]
-                    else:
-                        raise ValueError(
-                            f"Reference name is not provided. Valid values: {reference_name_tuple}"
-                        )
-            # Load segments
-            if load_alignment:
-                segment_list = [
-                    seg
-                    for seg in alignment_file.fetch(
-                        contig=reference_name, start=start, stop=end, region=region
+                if reference_name is None and len(reference_names) == 1:
+                    reference_name = reference_names[0]
+                if reference_name is None and len(reference_names)> 1:
+                    raise ValueError(
+                        f"Reference name is not provided. Found {len(reference_names)} reference sequences in the file: {reference_names!r}"
                     )
-                    if seg.is_mapped
-                ]
-                if not segment_list:
-                    warnings.warn("No aligned segments loaded.")
-            else:
-                segment_list = None
-            # Load pileup
-            if load_pileup and segment_list:
-                pileup_depths = {}
-                pileup_bases = {}
-                for col in alignment_file.pileup(
+            # Load segments
+            segment_list: list[AlignedSegment] = [
+                AlignedSegment(seg)
+                for seg in alignment_file.fetch(
                     contig=reference_name, start=start, stop=end, region=region
-                ):
-                    position: int = col.reference_pos
-                    query_bases: list[str] = [
-                        b.upper() for b in col.get_query_sequences() if b
-                    ]
-                    pileup_depths[position] = len(
-                        query_bases
-                    )  # col.nsegments includes reference skips; use len(query_bases) instead
-                    base_counter = collections.Counter(query_bases)
-                    if len(base_counter) > 1:
-                        pileup_bases[position] = base_counter
-                # If a position has no coverage, there will be no columns corresponding to that position.
-                # Need to manually add zeros to the pileup_depths for correct plotting
-                sorted_pileup_depths = {}
-                for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
-                    sorted_pileup_depths[position] = pileup_depths.get(position, 0)
-                pileup_depths = sorted_pileup_depths
-            else:
-                pileup_depths = None
-                pileup_bases = None
+                )
+                if seg.is_mapped
+            ]
+            if not segment_list:
+                raise ValueError("No aligned segments were found")
+            # Load pileup
+            pileup_depths: dict[int, int] = {}
+            pileup_bases: dict[int, collections.Counter[str]] = {}
+            for col in alignment_file.pileup(
+                contig=reference_name, start=start, stop=end, region=region
+            ):
+                position: int = col.reference_pos
+                query_bases: list[str] = [
+                    b.upper() for b in col.get_query_sequences() if b
+                ]
+                pileup_depths[position] = len(
+                    query_bases
+                )  # col.nsegments includes reference skips; use len(query_bases) instead
+                base_counter = collections.Counter(query_bases)
+                if len(base_counter) > 1:
+                    pileup_bases[position] = base_counter
+            # If a position has no coverage, there will be no columns corresponding to that position.
+            # Need to manually add zeros to the pileup_depths for correct plotting
+            sorted_pileup_depths : dict[int, int] = {}
+            for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
+                sorted_pileup_depths[position] = pileup_depths.get(position, 0)
+            pileup_depths = sorted_pileup_depths
 
             return cls(
-                segments=[AlignedSegment(seg) for seg in segment_list],
+                segments=segment_list,
                 pileup_depths=pileup_depths,
                 pileup_bases=pileup_bases,
                 reference_name=reference_name,

@@ -21,12 +21,11 @@ def test_load_bam():
     )
     assert len(p.segments) == 912
 
-    with pytest.warns(UserWarning):
+    with pytest.raises(ValueError):
         p = lv.SequenceAlignment.from_file(
             "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam",
             reference_name="1",
         )
-    assert len(p.segments) == 0
 
 
 def test_group_segments():

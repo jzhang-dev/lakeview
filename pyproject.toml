@@ -8,14 +8,13 @@ description = "A Python library for creating publication-quality genome visualis
 readme = "README.md"
 version = "0.1.0"
 requires-python = ">=3.7"
-keywords = ["bioinformatics", "visualisation"]
+keywords = ["bioinformatics", "genomics", "visualisation"]
 license = {text = "GNU GENERAL PUBLIC LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
     "Bio",
-    "ipympl",
     "IPython",
     "ipywidgets",
     "matplotlib",
