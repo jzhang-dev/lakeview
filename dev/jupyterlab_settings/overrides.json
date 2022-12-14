@@ -1,0 +1,32 @@
+{
+    "@jupyterlab/apputils-extension:themes":{
+        "theme":"JupyterLab Horizon",
+        "theme-scrollbars":true
+    },
+    "@jupyterlab/application-extension:sidebar":{
+        "overrides":{
+            "jp-property-inspector":"left",
+            "jp-debugger-sidebar":"left"
+        }
+    },
+    "@jupyterlab/fileeditor-extension:plugin":{
+        "editorConfig":{
+            "autoClosingBrackets":true,
+            "cursorBlinkRate":530,
+            "insertSpaces":true,
+            "lineNumbers":true,
+            "lineWrap":"off",
+            "matchBrackets":true,
+            "tabSize":4,
+            "rulers":[
+                
+            ]
+        }
+    },
+    "@jupyterlab/filebrowser-extension:browser":{
+        "showHiddenFiles":true
+    },
+    "@jupyterlab/codemirror-extension:commands":{
+        "styleActiveLine":true
+    }
+}

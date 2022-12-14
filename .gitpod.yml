@@ -5,7 +5,6 @@ tasks:
   - name: install_lakeview
     init: | 
       pip install -ve . &&
-      gp sync-done install_lakeview
   
   # - name: run_notebooks
   #   init: | 
@@ -17,7 +16,10 @@ tasks:
 
     
   - name: run_jupyterlab
-    command: jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
+    command: |
+      mkdir -p /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings
+      cp dev/jupyterlab_settings/overrides.json /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings/overrides.json
+      jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
 
   - name: run_http_server
     command: cd docs && python -m http.server 8000

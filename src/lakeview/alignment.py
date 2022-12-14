@@ -830,7 +830,7 @@ class SequenceAlignment(TrackPainter):
         min_hard_clipping_size: float = 10,
         show_reference_skips: bool = True,
         show_group_labels: Optional[bool] = None,
-        show_group_separators: bool = None,
+        show_group_separators: bool = True,
         max_group_height: float = 1000,
         backbones_kw={},
         arrowheads_kw={},
@@ -982,9 +982,7 @@ class SequenceAlignment(TrackPainter):
             self._draw_group_labels(
                 ax, groups, offsets, group_labels=group_label_dict, **group_labels_kw
             )
-        if show_group_separators is True or (
-            show_group_separators is None and group_by is not None
-        ):
+        if show_group_separators is True:
             self._draw_group_separators(ax, groups, offsets, **group_separators_kw)
 
         # Set axis limits
@@ -1316,13 +1314,15 @@ class SequenceAlignment(TrackPainter):
             )
 
     def _draw_group_separators(
-        self, ax, groups, offsets, *, linewidth=1, color="gray", linestyle="-"
+        self, ax, groups, offsets, *, linewidth=1, color="gray", linestyle="-", **kw
     ):
+        if len(set(groups)) <= 1: # Only one group
+            return
         max_group_offset_dict = collections.defaultdict(lambda: 0)
         for g, y in zip(groups, offsets):
             max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
         for y in max_group_offset_dict.values():
-            ax.axhline(y + 1, linewidth=linewidth, color=color, linestyle=linestyle)
+            ax.axhline(y + 1, linewidth=linewidth, color=color, linestyle=linestyle, **kw)
 
     def _draw_links(
         self,
