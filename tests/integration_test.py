@@ -39,6 +39,26 @@ def test_SKBR3():
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 200e3
 
+    OUTPUT_PNG_PATH = "tests/output/SKBR3_PacBio_SNP_tagging.png"
+    gv = lv.GenomeViewer(2, figsize=(12, 12), height_ratios=(1, 8))
+    pacbio_painter.draw_pileup(gv.axes[0])
+
+    def snp_tag(segment, position):
+        qry_seq = segment.get_aligned_query_sequence(position)
+        if qry_seq in ("T", "G"):
+            return qry_seq
+        return ""
+
+    pacbio_painter.draw_alignment(
+        gv.axes[1],
+        group_by=lambda seg: snp_tag(seg, 64_043_248),
+        show_mismatches=True,
+        mismatches_kw=dict(linewidth=3), max_group_height=20
+    )
+    gv.set_xlim(64042997, 64043297)
+    gv.savefig(OUTPUT_PNG_PATH, dpi=300)
+    assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
+
 
 def test_GNAS_WES():
     EXON_BAM_PATH = "tests/data/HG002_GNAS_Illumina_WES.bam"

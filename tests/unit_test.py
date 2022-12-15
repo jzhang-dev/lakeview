@@ -97,3 +97,9 @@ def test_sort_segments():
         >= segments[50].query_alignment_length
         >= segments[-1].query_alignment_length
     )
+
+
+def test_get_aligned_query_sequence():
+    p = lv.SequenceAlignment.from_file("tests/data/SKBR3_PacBio.bam", region='17:64,042,916-64,043,519')
+    counter = collections.Counter(seg.get_aligned_query_sequence(64_043_248) for seg in p.segments)
+    assert counter['T'] == 91 and counter['G'] == 52

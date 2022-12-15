@@ -350,24 +350,35 @@ class AlignedSegment:
     def get_aligned_reference_position(self, query_position: int) -> Optional[int]:
         return self.reference_position_dict[query_position]
 
-    def get_aligned_sequence(self, reference_start, reference_end=None):  # TODO
-        pass
+    def get_aligned_query_sequence(self, reference_position: int) -> Optional[str]:
+        # Note: reference_position is 0-indexed. 
+        if reference_position < self.reference_start or reference_position >= self.reference_end:
+            return None # Outside the alignment
+        query_positions: list[int] = []
+        for qry_pos, ref_pos in self.get_aligned_pairs():
+            if ref_pos == reference_position:
+                if qry_pos is None:
+                    return "-" # Deletion
+                query_positions.append(qry_pos)
+            elif query_positions:
+                break
+        return "".join(self.query_sequence[i] for i in query_positions)
 
-    @property
-    def _alignment_match_intervals(self) -> list[tuple[float, float]]:
-        intervals: list[tuple[float, float]] = []
-        for m in self.alignment_matches:
-            interval_start = m.reference_position - 0.5
-            interval_end = interval_start + m.size
-            if intervals:
-                # Check previous interval and merge if possible
-                previous_start, previous_end = intervals.pop(-1)
-                if interval_start - previous_end <= 0:
-                    interval_start = previous_start
+    def get_blocks(self) -> list[tuple[int, int]]:
+        return self.wrapped.get_blocks()
+
+    def get_normalized_blocks(self) -> list[tuple[int, int]]:
+        blocks: list[tuple[int, int]] = []
+        for block_start, block_end in self.get_blocks():
+            if blocks:
+                # Check previous block and merge if possible
+                previous_start, previous_end = blocks.pop(-1)
+                if block_start - previous_end <= 0:
+                    block_start = previous_start
                 else:
-                    intervals.append((previous_start, previous_end))
-            intervals.append((interval_start, interval_end))
-        return intervals
+                    blocks.append((previous_start, previous_end))
+            blocks.append((block_start, block_end))
+        return blocks
 
     @property
     def alignment_matches(self) -> list[AlignmentMatch]:
@@ -453,7 +464,7 @@ class AlignedSegment:
 
 
 @dataclass
-class LinkedSegment:
+class _LinkedSegment:
     segments: list[AlignedSegment]
 
     @property
@@ -502,14 +513,27 @@ class SequenceAlignment(TrackPainter):
         **kw,
     ) -> SequenceAlignment:
         with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
-            # Check reference_name
-            reference_names: tuple[str, ...] = alignment_file.references
+            reference_names: set[str] = set(alignment_file.references)
+            # Check `reference_name`
             if start is not None or end is not None:
                 if reference_name is None and len(reference_names) == 1:
-                    reference_name = reference_names[0]
-                if reference_name is None and len(reference_names) > 1:
+                    reference_name = list(reference_names)[0]
+                elif reference_name is None and len(reference_names) > 1:
                     raise ValueError(
-                        f"Reference name is not provided. Found {len(reference_names)} reference sequences in the file: {reference_names!r}"
+                        f"Reference name is not provided. Valid values: {reference_names!r}"
+                    )
+                elif reference_name is not None and reference_name not in reference_names:
+                    raise ValueError(
+                        f"Reference name {reference_name!r} is not found. Found {len(reference_names)} reference sequences in the file: {reference_names!r}"
+                    )
+            # Check `region`
+            if region is not None:
+                # Remove possible commas from `region`
+                region = ''.join(s for s in region if s != ',')
+                region_reference_name = region.split(":")[0]
+                if region_reference_name not in reference_names:
+                    raise ValueError(
+                        f"Reference name {region_reference_name!r} is not found. Valid values: {reference_names!r}"
                     )
             # Load segments
             segment_list: list[AlignedSegment] = [
@@ -555,13 +579,13 @@ class SequenceAlignment(TrackPainter):
     @staticmethod
     def _link_segments(
         segments: Sequence[AlignedSegment], links: Sequence[LinkIdentifier]
-    ) -> dict[LinkIdentifier, LinkedSegment]:
+    ) -> dict[LinkIdentifier, _LinkedSegment]:
         link_seg_dict = collections.defaultdict(list)
         for seg, link in zip(segments, links):
             link_seg_dict[link].append(seg)
         link_ls_dict = {}
         for link, seg_list in link_seg_dict.items():
-            linked_segment = LinkedSegment(seg_list)
+            linked_segment = _LinkedSegment(seg_list)
             link_ls_dict[link] = linked_segment
         return link_ls_dict
 
@@ -989,9 +1013,9 @@ class SequenceAlignment(TrackPainter):
     def _draw_backbones(self, ax, segments, offsets, height, *, colors, **kw):
         lines: list[tuple[Point, Point]] = []
         for seg, y in zip(segments, offsets):
-            for interval_start, interval_end in seg._alignment_match_intervals:
-                start_point = (interval_start, y)
-                end_point = (interval_end, y)
+            for block_start, block_end in seg.get_normalized_blocks():
+                start_point = (block_start - 0.5, y)
+                end_point = (block_end - 0.5, y)
                 lines.append((start_point, end_point))
         # Match line
         ax.add_collection(
@@ -1332,7 +1356,7 @@ class SequenceAlignment(TrackPainter):
         linestyle="-",
         **kw,
     ):
-        link_ls_dict: dict[LinkIdentifier, LinkedSegment] = self._link_segments(
+        link_ls_dict: dict[LinkIdentifier, _LinkedSegment] = self._link_segments(
             segments, links
         )
         link_offset_dict: dict[LinkIdentifier, int] = {}
