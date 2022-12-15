@@ -1,20 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from __future__ import annotations
+from typing import Optional, Sequence
 from warnings import warn
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from IPython.display import display
 import ipywidgets
 
-# TODO: give up interactivity?
+# TODO: remove ipympl?
 # TODO: more buttons; auto x tick labels; prevent fig resizing
 # TODO: fix first display problem; smart scrolling / resizing; show certain artists only when zooming in;
 # TODO: Fix interactivity; JS error
 
 
 class GenomeViewer:
-    def __init__(self, nrows=1, *, height_ratios=None, figsize=(10, 10)):
+    def __init__(
+        self,
+        nrows: int = 1,
+        *,
+        height_ratios: Optional[Sequence[float]] = None,
+        figsize: tuple[float, float] = (10, 10),
+    ) -> None:
         self._background = None
         self._vlines = None
         self._initial_xlim = None
@@ -28,17 +36,17 @@ class GenomeViewer:
             sharey=False,
             squeeze=False,
             gridspec_kw=dict(height_ratios=height_ratios),
-            constrained_layout=True
+            constrained_layout=True,
         )
         self.figure = fig
         # self.blit_manager = _BlitManager(fig.canvas)
         self.axes = list(axes[:, 0])
         self._init_app()
 
-    def _init_app(self):
+    def _init_app(self)-> None:
         backend = mpl.get_backend()
         if backend == "module://ipympl.backend_nbagg":
-            self.use_ipympl=True
+            self.use_ipympl = True
             canvas = self.figure.canvas
             canvas.toolbar_visible = True
             canvas.toolbar_position = "right"
@@ -50,7 +58,7 @@ class GenomeViewer:
             # warn(
             #     f"Backend ipympl not activated. Current backend: {backend}. To enable additional interactive functionality, please activate ipympl using `%matplotlib widget`."
             # )
-            self.use_ipympl=False
+            self.use_ipympl = False
             center_widget = ipywidgets.Output()
 
         zoom_in_button = ipywidgets.Button(description="Zoom in")
@@ -67,7 +75,10 @@ class GenomeViewer:
         reset_button.on_click(lambda _: self.reset())
 
         region_text = ipywidgets.Text(
-            value="", placeholder="", description="", disabled=False,
+            value="",
+            placeholder="",
+            description="",
+            disabled=False,
         )
         self.region_text = region_text
         go_button = ipywidgets.Button(description="Go")
@@ -82,7 +93,6 @@ class GenomeViewer:
                         shift_right_button,
                         zoom_in_button,
                         zoom_out_button,
-                        
                     ]
                 ),
             ]
@@ -94,28 +104,33 @@ class GenomeViewer:
             center=center_widget, footer=footer_widget, pane_heights=[0, 1, "100px"]
         )
 
-    def set_xlim(self, *args, **kw):
-        self.axes[0].set_xlim(*args, **kw)
+    @property
+    def xaxis(self) -> mpl.axis.XAxis:
+        return self.axes[-1].xaxis
 
-    def get_xlim(self):
+    def set_xlim(self, *args, **kw) -> tuple[float, float]:
+        return self.axes[0].set_xlim(*args, **kw)
+
+    def get_xlim(self) -> tuple[float, float]:
         return self.axes[0].get_xlim()
-    
-    def set_xlabel(self, *args, **kw):
+
+    def set_xlabel(self, *args, **kw) -> mpl.text.Text:
         self.axes[-1].set_xlabel(*args, **kw)
 
-    def set_title(self, *args, **kw):
+    def set_title(self, *args, **kw)-> mpl.text.Text:
         self.axes[0].set_title(*args, **kw)
 
     def savefig(self, *args, **kw):
         if self._interacted:
-            warn("The figure has been modified interactively before saving. This will make it harder for the output to be reproduced in the future.")
+            warn(
+                "The figure has been modified interactively before saving. This will make it harder for the output to be reproduced in the future."
+            )
         return self.figure.savefig(*args, **kw)
 
     def _ipython_display_(self):
         self._initial_xlim = self.get_xlim()
         self.update(interactive=False)
         return display(self.app)
-
 
     def zoom(self, scale, /):
         for ax in self.figure.axes:
@@ -146,16 +161,18 @@ class GenomeViewer:
             ax.set_xlim(start, end)
         self.update()
 
-
     def show_vertical_line(self, x=None):
         vlines = self._vlines
         if vlines is None and x is not None:
-            vlines = [ax.axvline(x, color="k", lw=1, zorder=10, animated=True) for ax in self.axes]
+            vlines = [
+                ax.axvline(x, color="k", lw=1, zorder=10, animated=True)
+                for ax in self.axes
+            ]
             self._vlines = vlines
         if x is not None:
             for l in vlines:
                 l.set_xdata([x, x])
-        
+
         bg = self._background
         if bg:
             self.figure.canvas.restore_region(bg)
@@ -166,8 +183,7 @@ class GenomeViewer:
             self.figure.canvas.flush_events()
         else:
             self.update()
-        
-        
+
     def hide_vertical_line(self):
         bg = self._background
         if bg:
@@ -193,8 +209,6 @@ class GenomeViewer:
             for line in vlines:
                 line.set_visible(False)
         self.update()
-        
-
 
     def update(self, *, interactive=True):
         if interactive:
@@ -208,5 +222,4 @@ class GenomeViewer:
             with self.center_widget:
                 display(self.figure)
         self._background = self.figure.canvas.copy_from_bbox(self.figure.bbox)
-        #self.show_vertical_line()
-
+        # self.show_vertical_line()

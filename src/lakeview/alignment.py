@@ -312,6 +312,7 @@ class AlignedSegment:
         self.is_reverse: bool = not self.is_forward
         self.is_proper_pair: bool = wrapped.is_proper_pair
         self.is_secondary: bool = wrapped.is_secondary
+        self.is_supplementary: bool = wrapped.is_supplementary
         self.is_mapped: bool = wrapped.is_mapped  # type: ignore
         self.query_alignment_length: int = wrapped.query_alignment_length
 
@@ -1318,7 +1319,7 @@ class SequenceAlignment(TrackPainter):
         offsets,
         links,
         *,
-        linewidth=0.5,
+        linewidth=1.5,
         color="lightgray",
         linestyle="-",
         **kw,
