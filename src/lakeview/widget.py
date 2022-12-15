@@ -8,11 +8,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from IPython.display import display
 import ipywidgets
+from .custom_types import Figure, Axes
 
-# TODO: more buttons; auto x tick labels; prevent fig resizing
-# TODO: fix first display problem; smart scrolling / resizing; show certain artists only when zooming in;
-# TODO: Fix interactivity; JS error
-
+# TODO: auto x tick formatter
 
 class GenomeViewer:
     def __init__(
@@ -22,27 +20,23 @@ class GenomeViewer:
         height_ratios: Optional[Sequence[float]] = None,
         figsize: tuple[float, float] = (10, 10),
     ) -> None:
-        self._background = None
-        self._vlines = None
-        self._initial_xlim = None
-        self._interacted = False
-
-        fig, axes = plt.subplots(
-            nrows=nrows,
-            ncols=1,
-            figsize=figsize,
-            sharex=True,
-            sharey=False,
-            squeeze=False,
-            gridspec_kw=dict(height_ratios=height_ratios),
-            constrained_layout=True,
-        )
-        self.figure = fig
-        # self.blit_manager = _BlitManager(fig.canvas)
-        self.axes = list(axes[:, 0])
+        self._initial_xlim: Optional[tuple[float, float]] = None
+        with plt.ioff():
+            fig, axes = plt.subplots(
+                nrows=nrows,
+                ncols=1,
+                figsize=figsize,
+                sharex=True,
+                sharey=False,
+                squeeze=False,
+                gridspec_kw=dict(height_ratios=height_ratios),
+                constrained_layout=True,
+            )
+        self.figure: Figure = fig
+        self.axes: list[Axes] = list(axes[:, 0])
         self._init_app()
 
-    def _init_app(self)-> None:
+    def _init_app(self) -> None:
         center_widget = ipywidgets.Output()
 
         zoom_in_button = ipywidgets.Button(description="Zoom in")
@@ -56,7 +50,7 @@ class GenomeViewer:
         shift_right_button.on_click(lambda __: self.shift(0.15))
 
         reset_button = ipywidgets.Button(description="Reset")
-        reset_button.on_click(lambda _: self.reset())
+        reset_button.on_click(lambda _: self.reset_xlim())
 
         region_text = ipywidgets.Text(
             value="",
@@ -64,9 +58,9 @@ class GenomeViewer:
             description="",
             disabled=False,
         )
-        self.region_text = region_text
+        self._region_text = region_text
         go_button = ipywidgets.Button(description="Go")
-        go_button.on_click(lambda __: self.goto(self.region_text.value))
+        go_button.on_click(lambda __: self._goto_region(self._region_text.value))
 
         footer_widget = ipywidgets.VBox(
             [
@@ -81,9 +75,9 @@ class GenomeViewer:
                 ),
             ]
         )
-        self.center_widget = center_widget
-        self.footer_widget = footer_widget
-        self.update(interactive=False)
+        self._center_widget = center_widget
+        self._footer_widget = footer_widget
+        #self.update_display()
         self.app = ipywidgets.AppLayout(
             center=center_widget, footer=footer_widget, pane_heights=[0, 1, "100px"]
         )
@@ -101,20 +95,16 @@ class GenomeViewer:
     def set_xlabel(self, *args, **kw) -> mpl.text.Text:
         self.axes[-1].set_xlabel(*args, **kw)
 
-    def set_title(self, *args, **kw)-> mpl.text.Text:
+    def set_title(self, *args, **kw) -> mpl.text.Text:
         self.axes[0].set_title(*args, **kw)
 
-    def savefig(self, *args, **kw):
-        if self._interacted:
-            warn(
-                "The figure has been modified interactively before saving. This will make it harder for the output to be reproduced in the future."
-            )
-        return self.figure.savefig(*args, **kw)
+    def savefig(self, *args, **kw) -> None:
+        self.figure.savefig(*args, **kw)
 
-    def _ipython_display_(self):
+    def _ipython_display_(self) -> None:
         self._initial_xlim = self.get_xlim()
-        self.update(interactive=False)
-        return display(self.app)
+        self.update_display()
+        display(self.app)
 
     def zoom(self, scale, /):
         for ax in self.figure.axes:
@@ -124,7 +114,7 @@ class GenomeViewer:
             new_radius = radius * scale
             new_xlim = (center - new_radius, center + new_radius)
             ax.set_xlim(new_xlim)
-        self.update()
+        self.update_display()
 
     def shift(self, distance, /):
         for ax in self.figure.axes:
@@ -135,72 +125,28 @@ class GenomeViewer:
                 old_xlim[1] + distance * radius,
             )
             ax.set_xlim(new_xlim)
-        self.update()
+        self.update_display()
 
-    def goto(self, region):
+    def goto(self, start: float, end: float) -> None:
+        self.set_xlim(start, end)
+        self.update_display()
+
+    def _goto_region(self, region: str) -> None:
         start, end = region.split("-")
-        start = float("".join(x for x in start if x not in (" ", "\t", ",")))
-        end = float("".join(x for x in end if x not in (" ", "\t", ",")))
-        for ax in self.figure.axes:
-            ax.set_xlim(start, end)
-        self.update()
-
-    def show_vertical_line(self, x=None):
-        vlines = self._vlines
-        if vlines is None and x is not None:
-            vlines = [
-                ax.axvline(x, color="k", lw=1, zorder=10, animated=True)
-                for ax in self.axes
-            ]
-            self._vlines = vlines
-        if x is not None:
-            for l in vlines:
-                l.set_xdata([x, x])
-
-        bg = self._background
-        if bg:
-            self.figure.canvas.restore_region(bg)
-            if vlines:
-                for ax, l in zip(self.axes, vlines):
-                    ax.draw_artist(l)
-            self.figure.canvas.blit(self.figure.bbox)
-            self.figure.canvas.flush_events()
+        if start.isnumeric() and end.isnumeric():
+            self.goto(float(start), float(end))
         else:
-            self.update()
+            raise ValueError(f"Invalid region {region!r}")
 
-    def hide_vertical_line(self):
-        bg = self._background
-        if bg:
-            self.figure.canvas.restore_region(bg)
-            self.figure.canvas.blit(self.figure.bbox)
-            self.figure.canvas.flush_events()
-        else:
-            self.update()
-
-    def on_click(self, event):
-        # TODO: use blitz to improve performance
-        if event.inaxes:
-            self.show_vertical_line(event.xdata)
-        else:
-            self.hide_vertical_line()
-
-    def reset(self):
+    def reset_xlim(self) -> None:
         initial_xlim = self._initial_xlim
-        if initial_xlim:
+        if initial_xlim is not None:
             self.set_xlim(initial_xlim)
-        vlines = self._vlines
-        if vlines:
-            for line in vlines:
-                line.set_visible(False)
-        self.update()
+        self.update_display()
 
-    def update(self, *, interactive=True):
-        if interactive:
-            self._interacted = True
+    def update_display(self):
         start, end = self.get_xlim()
-        self.region_text.value = f"{int(start):,} - {int(end):,}"
-        self.center_widget.clear_output(wait=True)
-        with self.center_widget:
+        self._region_text.value = f"{int(start):,} - {int(end):,}"
+        self._center_widget.clear_output(wait=True)
+        with self._center_widget:
             display(self.figure)
-        self._background = self.figure.canvas.copy_from_bbox(self.figure.bbox)
-        # self.show_vertical_line()

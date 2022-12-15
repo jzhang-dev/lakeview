@@ -4,7 +4,7 @@
 from __future__ import annotations
 from typing import Union, Literal, Tuple, Sequence
 from collections.abc import Hashable
-from matplotlib import axes
+import matplotlib as mpl
 
 NativeHashable = Union[int, float, str, Tuple[Hashable, ...], frozenset]
 GroupIdentifier = NativeHashable
@@ -13,5 +13,6 @@ Color = Union[Tuple[float, float, float], Tuple[float, float, float, float], str
 Position = Union[int, float]
 Point = Tuple[float, float]
 Line = Sequence[Point]
-Axes = axes.Axes
+Figure = mpl.figure.Figure
+Axes = mpl.axes.Axes
 Base = Literal["A", "T", "C", "G"]
