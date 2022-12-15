@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 import ipywidgets
 
-# TODO: remove ipympl?
 # TODO: more buttons; auto x tick labels; prevent fig resizing
 # TODO: fix first display problem; smart scrolling / resizing; show certain artists only when zooming in;
 # TODO: Fix interactivity; JS error
@@ -44,22 +43,7 @@ class GenomeViewer:
         self._init_app()
 
     def _init_app(self)-> None:
-        backend = mpl.get_backend()
-        if backend == "module://ipympl.backend_nbagg":
-            self.use_ipympl = True
-            canvas = self.figure.canvas
-            canvas.toolbar_visible = True
-            canvas.toolbar_position = "right"
-            canvas.header_visible = False
-            canvas.footer_visible = False
-            canvas.mpl_connect("button_press_event", lambda event: self.on_click(event))
-            center_widget = canvas
-        else:
-            # warn(
-            #     f"Backend ipympl not activated. Current backend: {backend}. To enable additional interactive functionality, please activate ipympl using `%matplotlib widget`."
-            # )
-            self.use_ipympl = False
-            center_widget = ipywidgets.Output()
+        center_widget = ipywidgets.Output()
 
         zoom_in_button = ipywidgets.Button(description="Zoom in")
         zoom_out_button = ipywidgets.Button(description="Zoom out")
@@ -215,11 +199,8 @@ class GenomeViewer:
             self._interacted = True
         start, end = self.get_xlim()
         self.region_text.value = f"{int(start):,} - {int(end):,}"
-        if self.use_ipympl:
-            self.figure.canvas.draw()
-        else:
-            self.center_widget.clear_output(wait=True)
-            with self.center_widget:
-                display(self.figure)
+        self.center_widget.clear_output(wait=True)
+        with self.center_widget:
+            display(self.figure)
         self._background = self.figure.canvas.copy_from_bbox(self.figure.bbox)
         # self.show_vertical_line()

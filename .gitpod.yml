@@ -2,26 +2,21 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - name: install_lakeview
+  - name: Install Lakeview for development
     init: | 
       pip install -ve .
-  
-  # - name: run_notebooks
-  #   init: | 
-  #     gp sync-await install_lakeview
-  #     jupyter nbconvert --to html --execute docs/examples/HG002_IGH/HG002_IGH.py.ipynb --output=HG002_IGH.py.ipynb.html
-  #     jupyter nbconvert --to html --execute docs/examples/HG002_GNAS_WES/HG002_GNAS_WES.py.ipynb --output=HG002_GNAS_WES.py.ipynb.html
-  #     jupyter nbconvert --to html --execute docs/examples/IGH_dot_plot/IGH_dot_plot.py.ipynb --output=IGH_dot_plot.py.ipynb.html
-  #     jupyter nbconvert --to html --execute docs/examples/SKBR3/SKBR3.py.ipynb --output=SKBR3.py.ipynb.html
+
+  - name: Install jupyterlab-horizon-theme
+    init: pip install git+https://github.com/jzhang-dev/jupyterlab-horizon-theme
 
     
-  - name: run_jupyterlab
+  - name: Run JupyterLab
     command: |
       mkdir -p /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings
       cp dev/jupyterlab_settings/overrides.json /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings/overrides.json
       jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
 
-  - name: run_http_server
+  - name: Run HTTP server
     command: cd docs && python -m http.server 8000
 
 ports:
