@@ -41,7 +41,6 @@ from .custom_types import (
 )
 
 
-
 # TODO: Get query sequence by position
 # TODO: Max depth marker
 
@@ -476,7 +475,7 @@ class SequenceAlignment(TrackPainter):
     def __init__(
         self,
         segments: list[AlignedSegment],
-        pileup_depths:dict[int, int],
+        pileup_depths: dict[int, int],
         pileup_bases: dict[int, collections.Counter[str]],
         reference_name: Optional[str] = None,
         reference_sequence: Optional[str] = None,
@@ -502,15 +501,13 @@ class SequenceAlignment(TrackPainter):
         reference_sequence: Optional[str] = None,
         **kw,
     ) -> SequenceAlignment:
-        with pysam.AlignmentFile(
-            file_path, mode, **kw
-        ) as alignment_file:
+        with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
             # Check reference_name
             reference_names: tuple[str, ...] = alignment_file.references
             if start is not None or end is not None:
                 if reference_name is None and len(reference_names) == 1:
                     reference_name = reference_names[0]
-                if reference_name is None and len(reference_names)> 1:
+                if reference_name is None and len(reference_names) > 1:
                     raise ValueError(
                         f"Reference name is not provided. Found {len(reference_names)} reference sequences in the file: {reference_names!r}"
                     )
@@ -542,7 +539,7 @@ class SequenceAlignment(TrackPainter):
                     pileup_bases[position] = base_counter
             # If a position has no coverage, there will be no columns corresponding to that position.
             # Need to manually add zeros to the pileup_depths for correct plotting
-            sorted_pileup_depths : dict[int, int] = {}
+            sorted_pileup_depths: dict[int, int] = {}
             for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
                 sorted_pileup_depths[position] = pileup_depths.get(position, 0)
             pileup_depths = sorted_pileup_depths
@@ -820,6 +817,7 @@ class SequenceAlignment(TrackPainter):
         show_group_labels: Optional[bool] = None,
         show_group_separators: bool = True,
         max_group_height: float = 1000,
+        show_overheight_markers: bool = False,
         backbones_kw={},
         arrowheads_kw={},
         links_kw={},
@@ -833,6 +831,7 @@ class SequenceAlignment(TrackPainter):
         letters_kw={},
         group_labels_kw={},
         group_separators_kw={},
+        overheight_markers_kw={},
     ):
         """
         Groups are ordered by group id.
@@ -865,7 +864,13 @@ class SequenceAlignment(TrackPainter):
             min_spacing=min_spacing,
         )
 
-        # Remove segments exceeding `max_group_offset`
+        # Draw overheight markers
+        if show_overheight_markers:
+            self._draw_overheight_markers(
+                ax, segments, groups, offsets, **overheight_markers_kw
+            )
+
+        # Remove segments exceeding `max_group_offset` (overheight segments)
         segments, links, groups, offsets, colors = filter_by_keys(
             segments, links, groups, offsets, colors, keys=[y >= 0 for y in offsets]
         )
@@ -943,7 +948,7 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                operation='soft', 
+                operation="soft",
                 height=height,
                 min_clipping_size=min_soft_clipping_size,
                 show_arrowheads=show_arrowheads,
@@ -954,7 +959,7 @@ class SequenceAlignment(TrackPainter):
                 ax,
                 segments,
                 offsets,
-                operation='hard', 
+                operation="hard",
                 height=height,
                 min_clipping_size=min_hard_clipping_size,
                 show_arrowheads=show_arrowheads,
@@ -1290,6 +1295,7 @@ class SequenceAlignment(TrackPainter):
         for g, y in zip(groups, offsets):
             max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
         for g, y in max_group_offset_dict.items():
+            # TODO: add path effect for better visibility
             ax.text(
                 x=dx,
                 y=y + dy,
@@ -1304,13 +1310,15 @@ class SequenceAlignment(TrackPainter):
     def _draw_group_separators(
         self, ax, groups, offsets, *, linewidth=1, color="gray", linestyle="-", **kw
     ):
-        if len(set(groups)) <= 1: # Only one group
+        if len(set(groups)) <= 1:  # Only one group
             return
         max_group_offset_dict = collections.defaultdict(lambda: 0)
         for g, y in zip(groups, offsets):
             max_group_offset_dict[g] = max(max_group_offset_dict[g], y)
         for y in max_group_offset_dict.values():
-            ax.axhline(y + 1, linewidth=linewidth, color=color, linestyle=linestyle, **kw)
+            ax.axhline(
+                y + 1, linewidth=linewidth, color=color, linestyle=linestyle, **kw
+            )
 
     def _draw_links(
         self,
@@ -1363,7 +1371,7 @@ class SequenceAlignment(TrackPainter):
         min_clipping_size: float,
         show_arrowheads: bool,
         linewidth=1.5,
-        color: Color="deeppink",
+        color: Color = "deeppink",
         **kw,
     ):
         xs = []
@@ -1422,6 +1430,49 @@ class SequenceAlignment(TrackPainter):
                 ls="",
                 **kw,
             )
+
+    def _draw_overheight_markers(
+        self,
+        ax: Axes,
+        segments: Sequence[AlignedSegment],
+        groups: Sequence[GroupIdentifier],
+        offsets: Sequence[int],
+        linewidth: float = 3,
+        color: Color = "black",
+        **kw,
+    ) -> None:
+        # TODO: remove this?
+        # Get upper limit (minimum offset) of each group
+        group_min_offset_dict: dict[GroupIdentifier, int] = {}
+        for group, y in zip(groups, offsets):
+            if y < 0: 
+                continue
+            if group not in group_min_offset_dict:
+                group_min_offset_dict[group] = y
+            else:
+                group_min_offset_dict[group] = min(group_min_offset_dict[group], y)
+        # Get overheight segments
+        overheight_segments, overheight_groups = filter_by_keys(
+            segments, groups, keys=[y < 0 for y in offsets]
+        )
+        # Draw overheight markers
+        overheight_lines: list[Line] = []
+        for segment, group in zip(overheight_segments, overheight_groups):
+            y = group_min_offset_dict[group]
+            x0 = segment.reference_start
+            x1 = segment.reference_end
+            overheight_lines.append(((x0, y), (x1, y)))
+        print(overheight_lines)
+        ax.add_collection(
+            LineCollection(
+                overheight_lines,
+                linewidths=linewidth,
+                colors=color,
+                zorder=10,
+                facecolors="none",
+                **kw,
+            )
+        )
 
     @functools.cached_property
     def _reference_bases(self) -> dict[int, Optional[str]]:
