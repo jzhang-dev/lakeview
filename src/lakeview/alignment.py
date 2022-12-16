@@ -1011,7 +1011,16 @@ class SequenceAlignment(TrackPainter):
         ax.set_ylim(max(offsets) + 1, min(offsets) - 1)
         ax.set_yticks([])
 
-    def _draw_backbones(self, ax, segments, offsets, height, *, colors, **kw):
+    def _draw_backbones(
+        self,
+        ax: Axes,
+        segments: Sequence[AlignedSegment],
+        offsets: Sequence[float],
+        height: float,
+        *,
+        colors: Sequence[Color],
+        **kw,
+    ) -> None:
         lines: list[tuple[Point, Point]] = []
         for seg, y in zip(segments, offsets):
             for block_start, block_end in seg.get_normalized_blocks():
@@ -1029,8 +1038,16 @@ class SequenceAlignment(TrackPainter):
             )
         )
 
-    def _draw_arrowheads(self, ax, segments, offsets, height, *, colors, **kw):
-
+    def _draw_arrowheads(
+        self,
+        ax: Axes,
+        segments: Sequence[AlignedSegment],
+        offsets: Sequence[float],
+        height: float,
+        *,
+        colors: Sequence[Color],
+        **kw,
+    ) -> None:
         forward_xs = [seg.reference_end - 0.5 for seg in segments if seg.is_forward]
         forward_ys = [y for seg, y in zip(segments, offsets) if seg.is_forward]
         reverse_xs = [seg.reference_start - 0.5 for seg in segments if seg.is_reverse]

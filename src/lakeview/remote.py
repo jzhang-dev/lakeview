@@ -17,7 +17,7 @@ from ._region_string import (
 def download_bam(
     bam_url: str,
     output_bam_path: str,
-    region: Union[str, tuple[str, float, float], None] = None,
+    region: Union[str, tuple[str, int, int], None] = None,
     *,
     index_url: Optional[str] = None,
     output_index_path: Optional[str] = None,
