@@ -2,6 +2,8 @@
 # coding: utf-8
 
 import collections
+import tempfile
+import os
 import pytest
 import lakeview as lv
 
@@ -15,17 +17,22 @@ def test_load_bam():
 
     p = lv.SequenceAlignment.from_file(
         "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam",
-        reference_name="17",
-        start=64041800,
-        end=64043800,
+        region=("17", 64041800,64043800),
     )
     assert len(p.segments) == 912
 
     with pytest.raises(ValueError):
         p = lv.SequenceAlignment.from_file(
             "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam",
-            reference_name="1",
+            region="1",
         )
+
+def test_download_bam():
+    BAM_URL = "https://s3.amazonaws.com/igv.org.demo/SKBR3/SKBR3_550bp_pcrFREE_S1_L001_AND_L002_R1_001.101bp.bwamem.ill.mapped.sort.bam"
+    with tempfile.TemporaryDirectory() as d:
+        output_file = os.path.join(d, "test.bam")
+        lv.remote.download_bam(BAM_URL, region="17:64040802-64045633", output_bam_path=output_file)
+        assert os.path.getsize(output_file) > 100000
 
 
 def test_group_segments():

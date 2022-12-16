@@ -8,4 +8,4 @@ from .alignment import AlignedSegment, SequenceAlignment
 from .annotation import GeneAnnotation
 from .sequence import DotPlot
 from .widget import GenomeViewer
-from . import util, helpers
+from . import util, helpers, remote

@@ -17,7 +17,7 @@ from matplotlib.collections import LineCollection
 
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
 from .plot import get_ax_size
-from .custom_types import GroupIdentifier, Color, Axes, NativeHashable
+from ._custom_types import GroupIdentifier, Color, Axes, NativeHashable
 
 
 @dataclass

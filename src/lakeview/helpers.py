@@ -11,7 +11,7 @@ from numbers import Real
 import matplotlib as mpl
 from matplotlib.colors import rgb2hex
 import pysam
-from .custom_types import Color, NativeHashable
+from ._custom_types import Color, NativeHashable
 
 
 def sort_by_keys(
@@ -69,34 +69,7 @@ def filter_by_keys(*iterables: Sequence, keys: Sequence[bool]) -> list[list]:
     return filtered_lists
 
 
-def download_bam(
-    bam_url: str,
-    bai_url: str,
-    region: str,
-    output_bam_path: str,
-    output_bai_path: Optional[str] = None,
-    *,
-    index: bool = True,
-    override: bool = False,
-):
-    if not os.path.isfile(output_bam_path) or override:
-        workdir = os.getcwd()
-        with tempfile.TemporaryDirectory() as d:
-            try:
-                os.chdir(d)
-                bam_data = pysam.view("-X", "-b", bam_url, bai_url, region)  # type: ignore
-            finally:
-                os.chdir(workdir)
-        target_dir = os.path.split(output_bam_path)[0]
-        pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
-        with open(output_bam_path, "wb") as f:
-            f.write(bam_data)
-    if output_bai_path is None:
-        output_bai_path = output_bam_path + ".bai"
-    if index and (not os.path.isfile(output_bai_path) or override):
-        target_dir = os.path.split(output_bai_path)[0]
-        pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
-        pysam.index(output_bam_path, output_bai_path)  # type: ignore
+
 
 
 def pack_intervals(intervals: Iterable[tuple[float, float]]) -> list[int]:

@@ -28,7 +28,12 @@ import pysam
 
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
 from .plot import get_ax_size
-from .custom_types import (
+from ._region_string import (
+    parse_region_string,
+    normalize_region_string,
+    get_region_string,
+)
+from ._custom_types import (
     NativeHashable,
     GroupIdentifier,
     LinkIdentifier,
@@ -351,14 +356,17 @@ class AlignedSegment:
         return self.reference_position_dict[query_position]
 
     def get_aligned_query_sequence(self, reference_position: int) -> Optional[str]:
-        # Note: reference_position is 0-indexed. 
-        if reference_position < self.reference_start or reference_position >= self.reference_end:
-            return None # Outside the alignment
+        # Note: reference_position is 0-indexed.
+        if (
+            reference_position < self.reference_start
+            or reference_position >= self.reference_end
+        ):
+            return None  # Outside the alignment
         query_positions: list[int] = []
         for qry_pos, ref_pos in self.get_aligned_pairs():
             if ref_pos == reference_position:
                 if qry_pos is None:
-                    return "-" # Deletion
+                    return "-"  # Deletion
                 query_positions.append(qry_pos)
             elif query_positions:
                 break
@@ -504,43 +512,38 @@ class SequenceAlignment(TrackPainter):
         mode: Optional[
             Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
         ] = None,
-        reference_name: Optional[str] = None,
-        start: Optional[int] = None,
-        end: Optional[int] = None,
+        region: Union[str, tuple[str, float, float], None] = None,
         *,
-        region: Optional[str] = None,
         reference_sequence: Optional[str] = None,
         **kw,
     ) -> SequenceAlignment:
+        # Parse region
+        reference_name: Optional[str]
+        normalized_region: Optional[str]
+        if region is None:
+            reference_name = None
+            normalized_region = None
+        elif isinstance(region, str):
+            reference_name, start, end = parse_region_string(region)
+            normalized_region = normalize_region_string(region)
+        elif isinstance(region, tuple):
+            reference_name = region[0]
+            normalized_region = get_region_string(*region)
+        else:
+            raise TypeError(
+                f"Invalid value for `region`: {region!r}. Expecting an instance of Union[str, tuple[str, float, float], None]."
+            )
         with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
             reference_names: set[str] = set(alignment_file.references)
             # Check `reference_name`
-            if start is not None or end is not None:
-                if reference_name is None and len(reference_names) == 1:
-                    reference_name = list(reference_names)[0]
-                elif reference_name is None and len(reference_names) > 1:
-                    raise ValueError(
-                        f"Reference name is not provided. Valid values: {reference_names!r}"
-                    )
-                elif reference_name is not None and reference_name not in reference_names:
-                    raise ValueError(
-                        f"Reference name {reference_name!r} is not found. Found {len(reference_names)} reference sequences in the file: {reference_names!r}"
-                    )
-            # Check `region`
-            if region is not None:
-                # Remove possible commas from `region`
-                region = ''.join(s for s in region if s != ',')
-                region_reference_name = region.split(":")[0]
-                if region_reference_name not in reference_names:
-                    raise ValueError(
-                        f"Reference name {region_reference_name!r} is not found. Valid values: {reference_names!r}"
-                    )
+            if reference_name is not None and reference_name not in reference_names:
+                raise ValueError(
+                    f"Reference name {reference_name!r} is not found. Expecting one of {reference_names!r}"
+                )
             # Load segments
             segment_list: list[AlignedSegment] = [
                 AlignedSegment(seg)
-                for seg in alignment_file.fetch(
-                    contig=reference_name, start=start, stop=end, region=region
-                )
+                for seg in alignment_file.fetch(region=normalized_region)
                 if seg.is_mapped
             ]
             if not segment_list:
@@ -548,9 +551,7 @@ class SequenceAlignment(TrackPainter):
             # Load pileup
             pileup_depths: dict[int, int] = {}
             pileup_bases: dict[int, collections.Counter[str]] = {}
-            for col in alignment_file.pileup(
-                contig=reference_name, start=start, stop=end, region=region
-            ):
+            for col in alignment_file.pileup(region=normalized_region):
                 position: int = col.reference_pos
                 query_bases: list[str] = [
                     b.upper() for b in col.get_query_sequences() if b
@@ -1469,7 +1470,7 @@ class SequenceAlignment(TrackPainter):
         # Get upper limit (minimum offset) of each group
         group_min_offset_dict: dict[GroupIdentifier, int] = {}
         for group, y in zip(groups, offsets):
-            if y < 0: 
+            if y < 0:
                 continue
             if group not in group_min_offset_dict:
                 group_min_offset_dict[group] = y

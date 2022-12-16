@@ -8,7 +8,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from IPython.display import display
 import ipywidgets
-from .custom_types import Figure, Axes
+from ._custom_types import Figure, Axes
 
 # TODO: auto x tick formatter
 
