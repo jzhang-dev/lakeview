@@ -512,7 +512,7 @@ class SequenceAlignment(TrackPainter):
         mode: Optional[
             Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
         ] = None,
-        region: Union[str, tuple[str, float, float], None] = None,
+        region: Union[str, tuple[str, int, int], None] = None,
         *,
         reference_sequence: Optional[str] = None,
         **kw,
@@ -531,7 +531,7 @@ class SequenceAlignment(TrackPainter):
             normalized_region = get_region_string(*region)
         else:
             raise TypeError(
-                f"Invalid value for `region`: {region!r}. Expecting an instance of Union[str, tuple[str, float, float], None]."
+                f"Invalid value for `region`: {region!r}. Expecting an instance of Union[str, tuple[str, int, int], None]."
             )
         with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
             reference_names: set[str] = set(alignment_file.references)
