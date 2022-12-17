@@ -94,6 +94,7 @@ def test_IGH():
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
         gencode_painter = lv.GeneAnnotation.from_gencode_gtf(
             f,
+            'gtf',
             region=(CHROMOSOME, (START, END))
         )
     pacbio_painter = lv.SequenceAlignment.from_file(
@@ -131,7 +132,7 @@ def test_GAPDH_RNAseq():
     alignment_painter = lv.SequenceAlignment.from_file(RNA_BAM_PATH, CHROMOSOME)
     with gzip.open(REFSEQ_GFF_PATH, "rt") as f:
         annotation_painter = lv.GeneAnnotation.from_refseq_gff(
-            f, region=(CHROMOSOME, (START, END)), build="GRCh37"
+            f, 'gff3', region=('NC_000012.11', (START, END))
         )
 
     gv = lv.GenomeViewer(3, figsize=(8, 8), height_ratios=(1, 7, 2))

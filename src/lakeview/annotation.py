@@ -2,22 +2,16 @@
 # coding: utf-8
 
 from __future__ import annotations
-from typing import (
-    Optional,
-    Union,
-    Callable,
-    Literal,
-    TextIO,
-)
+from typing import Optional, Union, Callable, Literal, TextIO, TypeVar
 from collections.abc import Iterable, Sequence, Mapping, Container
 from dataclasses import dataclass, field, asdict
 import warnings
 import numpy as np
 from matplotlib.collections import LineCollection
-from ._region_string import (
-    parse_region_string,
-    normalize_region_string,
-    get_region_string,
+from ._region_notation import (
+    parse_region_notation,
+    normalize_region_notation,
+    get_region_notation,
 )
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
 from .plot import get_ax_size
@@ -84,8 +78,8 @@ class GeneAnnotation:
         attribute_string,
         *,
         field_separator,
-        keyval_separator,
-        multival_separator,
+        key_value_separator,
+        multiple_value_separator,
         quoted_values,
         trim_prefix=0,
         trim_suffix=0,
@@ -97,10 +91,10 @@ class GeneAnnotation:
         if trim_suffix > 0:
             attribute_string = attribute_string[:-trim_suffix]
         for field in attribute_string.split(field_separator):
-            key, value = field.split(keyval_separator)
+            key, value = field.split(key_value_separator)
             if quoted_values:
                 value = value.strip('"')
-            items = value.split(multival_separator)
+            items = value.split(multiple_value_separator)
             if len(items) > 1:
                 value = items
             attr_dict[key] = value
@@ -119,11 +113,11 @@ class GeneAnnotation:
         interval: tuple[int, int] | None
         normalized_region: str
         if isinstance(region, str):
-            sequence_name, interval = parse_region_string(region)
-            normalized_region = normalize_region_string(region)
+            sequence_name, interval = parse_region_notation(region)
+            normalized_region = normalize_region_notation(region)
         elif isinstance(region, tuple):
             sequence_name, interval = region
-            normalized_region = get_region_string(sequence_name, interval)
+            normalized_region = get_region_notation(sequence_name, interval)
         else:
             raise TypeError(
                 f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
@@ -134,29 +128,31 @@ class GeneAnnotation:
             start, end = 0, float("inf")
         else:
             start, end = interval
+
+        # Parse format
         # Ref: http://daler.github.io/gffutils/dialect.html
         # Ref: https://mblab.wustl.edu/GTF22.html
         # Ref: https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
         if format_ == "gtf":
             attr_kw = dict(
                 field_separator="; ",
-                keyval_separator=" ",
-                multival_separator=",",
+                key_value_separator=" ",
+                multiple_value_separator=",",
                 quoted_values=True,
                 trim_prefix=0,
                 trim_suffix=1,
             )
-        elif format_ in ("gff", "gff3"):
+        elif format_ == 'gff3':
             attr_kw = dict(
                 field_separator=";",
-                keyval_separator="=",
-                multival_separator=",",
+                key_value_separator="=",
+                multiple_value_separator=",",
                 quoted_values=True,
                 trim_prefix=0,
                 trim_suffix=0,
             )
         else:
-            raise ValueError("Only GTF and GFF3 formats are supported.")
+            raise ValueError(f"Invalid value for `format_`: {format!r}. Expecting one of ('gtf', 'gff3').")
 
         records: list[AnnotationRecord] = []
         for line in file_object:
@@ -200,31 +196,22 @@ class GeneAnnotation:
     def from_file(
         cls,
         file: str | TextIO,
+        format_: Literal["gtf", "gff3"],
         region: str | tuple[str, tuple[int, int]] | tuple[str, None],
         *,
-        format_: Literal["gtf", "gff", "gff3"],
-        sequence_name: Optional[str] = None,
-        start: Optional[float] = None,
-        end: Optional[float] = None,
         gene_features: Iterable[str] = ["gene"],
-        transcript_features: Iterable[str] = [
-            "transcript",
-            "primary_transcript",
-            "RNA",
-        ],
+        transcript_features: Iterable[str] = ["transcript"],
         exon_features: Iterable[str] = ["exon"],
         cds_features: Iterable[str] = ["CDS"],
-        transcript_key: str = "transcript_id",  # Fetch the transcript_id from a transcript record
-        parent_transcript_key: str = "transcript_id",  # Fetch the parent transcript_id from a exon/CDS record
-        gene_key: str = "gene_id",  # Fetch the gene_id from a gene record. Reserved for future use
-        parent_gene_key: str = "gene_id",  # Fetch the parent gene_id from a transcript record
     ):
+        # Combine features
         features: set[str] = (
             set(gene_features)
             | set(transcript_features)
             | set(exon_features)
             | set(cds_features)
         )
+        # Parse records
         if isinstance(file, str):
             with open(file, "rt") as f:
                 records = cls._parse_file(
@@ -242,7 +229,22 @@ class GeneAnnotation:
             )
         if not records:
             warnings.warn("No annotation records have been loaded.")
-
+        # Parse gene_key and transcript_key
+        transcript_key: str # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str # Fetch the parent transcript_id from a exon/CDS record
+        gene_key: str # Fetch the gene_id from a gene record. Reserved for future use
+        parent_gene_key: str # Fetch the parent gene_id from a transcript record
+        if format_ == 'gtf':
+            transcript_key = "transcript_id"
+            parent_transcript_key = "transcript_id"
+            gene_key = "gene_id"
+            parent_gene_key = "gene_id"
+        elif format_ == 'gff3':
+            transcript_key = "ID"
+            parent_transcript_key = "Parent"
+            gene_key = "ID"
+            parent_gene_key = "Parent"
+        # Identify genes, transcripts, exons, cdss
         genes, transcripts, exons, cdss = [], [], [], []
         for record in records:
             if record.feature in gene_features:
@@ -277,38 +279,17 @@ class GeneAnnotation:
     def from_gencode_gtf(
         cls,
         file: str | TextIO,
+        format_: Literal["gtf", "gff3"],
         region: str | tuple[str, tuple[int, int]] | tuple[str, None],
-        *,
-        build: Literal["GRCh38"] = "GRCh38",  # TODO: check GRCh37
     ):
-        if isinstance(region, str):
-            sequence_name = region
-        elif isinstance(region, tuple):
-            sequence_name = region[0]
-        else:
-            raise TypeError(
-                f"Invalid type for `region`: {type(region)!r}. Expecting str | tuple[str, tuple[int, int]] | tuple[str, None]."
-            )
-        gene_features = ["gene"]
-        transcript_features = ["transcript"]
-        exon_features = ["exon"]
-        cds_features = ["CDS"]
-        transcript_key = "transcript_id"
-        parent_transcript_key = "transcript_id"
-        gene_key = "gene_id"
-        parent_gene_key = "gene_id"
         instance = cls.from_file(
             file=file,
             region=region,
-            format_="gtf",
-            gene_features=gene_features,
-            transcript_features=transcript_features,
-            exon_features=exon_features,
-            cds_features=cds_features,
-            transcript_key=transcript_key,
-            parent_transcript_key=parent_transcript_key,
-            gene_key=gene_key,
-            parent_gene_key=parent_gene_key,
+            format_=format_,
+            gene_features=["gene"],
+            transcript_features=["transcript"],
+            exon_features=["exon"],
+            cds_features=["CDS"],
         )
         # Parse gene names
         for transcript in instance.transcripts:
@@ -319,84 +300,24 @@ class GeneAnnotation:
     def from_refseq_gff(
         cls,
         file: str | TextIO,
+        format_: Literal["gtf", "gff3"],
         region: str | tuple[str, tuple[int, int]] | tuple[str, None],
-        *,
-        build: Literal["GRCh37", "GRCh38"] = "GRCh38",  # TODO: check GRCh38
-        chromosome: Optional[str] = None,
-        start: Optional[float] = None,
-        end: Optional[float] = None,
     ):
-        # Sequence name
-        sequence_name: str
-        interval: tuple[int, int] | None
-        if isinstance(region, str):
-            sequence_name, interval = parse_region_string(region)
-        elif isinstance(region, tuple):
-            sequence_name, interval = region
-        else:
-            raise TypeError(
-                f"Invalid type for `region`: {type(region)!r}. Expecting str | tuple[str, tuple[int, int]] | tuple[str, None]."
-            )
-        chromosome_dict: dict[str, dict[str, str]] = dict(
-            GRCh37=dict(
-                chr1="NC_000001.10",
-                chr2="NC_000002.11",
-                chr3="NC_000003.11",
-                chr4="NC_000004.11",
-                chr5="NC_000005.9",
-                chr6="NC_000006.11",
-                chr7="NC_000007.13",
-                chr8="NC_000008.10",
-                chr9="NC_000009.11",
-                chr10="NC_000010.10",
-                chr11="NC_000011.9",
-                chr12="NC_000012.11",
-                chr13="NC_000013.10",
-                chr14="NC_000014.8",
-                chr15="NC_000015.9",
-                chr16="NC_000016.9",
-                chr17="NC_000017.10",
-                chr18="NC_000018.9",
-                chr19="NC_000019.9",
-                chr20="NC_000020.10",
-                chr21="NC_000021.8",
-                chr22="NC_000022.10",
-                chrX="NC_000023.10",
-                chrY="NC_000024.9",
-                chrM="NC_012920.1",
-            ),
-            GRCh38=dict(),
-        )
-        sequence_name = chromosome_dict[build][sequence_name]
-        region_string = get_region_string(sequence_name, interval)
-        # Features
-        gene_features = [
+        instance = cls.from_file(
+            file=file,
+            region=region,
+            format_=format_,
+            gene_features=[
             "gene",
             "C_gene_segment",
             "D_gene_segment",
             "J_gene_segment",
             "V_gene_segment",
             "pseudogene",
-        ]
-        transcript_features = ["transcript", "mRNA"]
-        exon_features = ["exon"]
-        cds_features = ["CDS"]
-        transcript_key = "ID"
-        parent_transcript_key = "Parent"
-        gene_key = "ID"
-        parent_gene_key = "Parent"
-        instance = cls.from_file(
-            file=file,
-            region=region_string,
-            format_="gff",
-            gene_features=gene_features,
-            transcript_features=transcript_features,
-            exon_features=exon_features,
-            cds_features=cds_features,
-            transcript_key=transcript_key,
-            parent_transcript_key=parent_transcript_key,
-            gene_key=gene_key,
-            parent_gene_key=parent_gene_key,
+        ],
+            transcript_features=["transcript", "mRNA"],
+            exon_features=["exon"],
+            cds_features=["CDS"],
         )
         # Parse gene names
         for transcript in instance.transcripts:

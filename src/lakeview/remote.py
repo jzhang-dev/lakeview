@@ -7,10 +7,10 @@ import os
 import pathlib
 from typing import Literal, Callable, Optional, Union
 import pysam
-from ._region_string import (
-    parse_region_string,
-    normalize_region_string,
-    get_region_string,
+from ._region_notation import (
+    parse_region_notation,
+    normalize_region_notation,
+    get_region_notation,
 )
 
 
@@ -28,14 +28,14 @@ def download_bam(
         index_url = bam_url + ".bai"
     if output_index_path is None:
         output_index_path = output_bam_path + ".bai"
-    region_string: Optional[str]
+    region_notation: Optional[str]
     if region is None:
-        region_string = None
+        region_notation = None
     elif isinstance(region, str):
-        region_string = normalize_region_string(region)
+        region_notation = normalize_region_notation(region)
     elif isinstance(region, tuple):
         reference_name, interval = region
-        region_string = get_region_string(reference_name, interval)
+        region_notation = get_region_notation(reference_name, interval)
     else:
         raise TypeError(
             f"Invalid type for `region`: {type(region)!r}. Expecting str | tuple[str, tuple[int, int]] | tuple[str, None] | None."
@@ -47,8 +47,8 @@ def download_bam(
             try:
                 os.chdir(d)
                 params = ["-X", "-b", bam_url, index_url]
-                if region_string:
-                    params.append(region_string)
+                if region_notation:
+                    params.append(region_notation)
                 bam_data = pysam.view(*params)  # type: ignore # pysam.view is not correctly typed.
             finally:
                 os.chdir(workdir)

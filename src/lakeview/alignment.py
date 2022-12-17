@@ -28,10 +28,10 @@ import pysam
 
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
 from .plot import get_ax_size
-from ._region_string import (
-    parse_region_string,
-    normalize_region_string,
-    get_region_string,
+from ._region_notation import (
+    parse_region_notation,
+    normalize_region_notation,
+    get_region_notation,
 )
 from ._custom_types import (
     NativeHashable,
@@ -532,11 +532,11 @@ class SequenceAlignment(TrackPainter):
         reference_name: str
         normalized_region: str
         if isinstance(region, str):
-            reference_name, interval = parse_region_string(region)
-            normalized_region = normalize_region_string(region)
+            reference_name, interval = parse_region_notation(region)
+            normalized_region = normalize_region_notation(region)
         elif isinstance(region, tuple):
             reference_name, interval = region
-            normalized_region = get_region_string(reference_name, interval)
+            normalized_region = get_region_notation(reference_name, interval)
         else:
             raise TypeError(
                 f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
