@@ -485,45 +485,50 @@ class _LinkedSegment:
 
 
 class SequenceAlignment(TrackPainter):
+    reference_name: str
     segments: list[AlignedSegment]
     pileup_depths: dict[int, int]
     pileup_bases: dict[int, collections.Counter[str]]
-    reference_name: Optional[str] = None
-    reference_sequence: Optional[str] = None
 
     def __init__(
         self,
+        reference_name:str,
         segments: list[AlignedSegment],
         pileup_depths: dict[int, int],
         pileup_bases: dict[int, collections.Counter[str]],
-        reference_name: Optional[str] = None,
-        reference_sequence: Optional[str] = None,
     ):
         self.segments: list[AlignedSegment] = [seg for seg in segments if seg.is_mapped]
         self.pileup_depths = pileup_depths
         self.pileup_bases = pileup_bases
         self.reference_name = reference_name
-        self.reference_sequence = reference_sequence
+
+    @classmethod
+    def from_pysam(
+        cls,
+        alignment_file: pysam.AlignmentFile,
+        region: Union[str, tuple[str, int, int], None] = None,
+        **kw,
+    ):
+
+        pass
 
     @classmethod
     def from_file(
         cls,
         file_path: str,
+        region: Union[str, tuple[str, Optional[int], Optional[int]]],
+        *,
         mode: Optional[
             Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
         ] = None,
-        region: Union[str, tuple[str, int, int], None] = None,
-        *,
-        reference_sequence: Optional[str] = None,
         **kw,
     ) -> SequenceAlignment:
         # Parse region
-        reference_name: Optional[str]
-        normalized_region: Optional[str]
-        if region is None:
-            reference_name = None
-            normalized_region = None
-        elif isinstance(region, str):
+        reference_name: str
+        start: Optional[int] = None
+        end: Optional[int] = None
+        normalized_region: str
+        if isinstance(region, str):
             reference_name, start, end = parse_region_string(region)
             normalized_region = normalize_region_string(region)
         elif isinstance(region, tuple):
@@ -531,12 +536,12 @@ class SequenceAlignment(TrackPainter):
             normalized_region = get_region_string(*region)
         else:
             raise TypeError(
-                f"Invalid value for `region`: {region!r}. Expecting an instance of Union[str, tuple[str, int, int], None]."
+                f"Invalid value for `region`: {region!r}. Expecting a samtools-compatible region string, or a three-element tuple containing reference name and start and end coordinates. Start and end can both be None."
             )
         with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
             reference_names: set[str] = set(alignment_file.references)
             # Check `reference_name`
-            if reference_name is not None and reference_name not in reference_names:
+            if reference_name not in reference_names:
                 raise ValueError(
                     f"Reference name {reference_name!r} is not found. Expecting one of {reference_names!r}"
                 )
@@ -570,12 +575,23 @@ class SequenceAlignment(TrackPainter):
             pileup_depths = sorted_pileup_depths
 
             return cls(
+                reference_name=reference_name,
                 segments=segment_list,
                 pileup_depths=pileup_depths,
                 pileup_bases=pileup_bases,
-                reference_name=reference_name,
-                reference_sequence=reference_sequence,
             )
+
+    @classmethod
+    def from_remote(
+        cls,
+        bam_url,
+        region: Union[str, tuple[str, int, int], None] = None,
+        *,
+        index_url: Optional[str] = None,
+        reference_sequence: Optional[str] = None,
+        **kw,
+    ):  # TODO
+        pass
 
     @staticmethod
     def _link_segments(
