@@ -2,49 +2,48 @@
 # coding: utf-8
 
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Union
 
 
-def get_region_string(
-    sequence_name: str, start: Optional[int] = None, end: Optional[int] = None
-) -> str:
+def get_region_string(sequence_name, interval: Optional[tuple[int, int]] = None) -> str:
     """
     Get a samtools-compatible region string from `sequence_name`, `start`, and `end`.
     Note that `start` and `end` coordinates are 0-based half-open intervals, while the samtools-compatible notation instead represent a 1-based closed interval.
     See https://pysam.readthedocs.io/en/latest/glossary.html#term-region
 
-    >>> get_region_string("chr1", 15000, 20000)
+    >>> get_region_string("chr1", (15000, 20000))
     'chr1:15001-20000'
     >>> get_region_string("chr1")
     'chr1'
     """
-    if start is None and end is None:
+    if interval is None:
         return sequence_name
-    elif start is not None and end is not None:
-        return f"{sequence_name}:{start+1}-{end}"
     else:
-        raise TypeError("`start` and `end` must be both integers or None")
+        start, end = interval
+        return f"{sequence_name}:{start+1}-{end}"
 
 
-def parse_region_string(region_string: str) -> tuple[str, Optional[int], Optional[int]]:
+def parse_region_string(
+    region_string: str,
+) -> tuple[str, Optional[tuple[int, int]]]:
     """
-    Parse `region_string` into (sequence_name, start, end).
+    Parse `region_string` into (sequence_name, interval).
     If `region_string` only contains sequence name, both `start` and `end` will be None.
     Raises ValueError if `region_string` is not correctly formatted.
 
     >>> parse_region_string("chr1:15001-20000")
-    ('chr1', 15000, 20000)
+    ('chr1', (15000, 20000))
     >>> parse_region_string("chr14:104,586,347-107,043,718")
-    ('chr14', 104586346, 107043718)
+    ('chr14', (104586346, 107043718))
     >>> parse_region_string("chr14")
-    ('chr14', None, None)
+    ('chr14', None)
     >>> parse_region_string("chr14:200")
     Traceback (most recent call last):
         ...
     ValueError: Invalid `region_string`: 'chr14:200'
     """
     if ":" not in region_string:
-        return region_string, None, None
+        return region_string, None
     error_message = f"Invalid `region_string`: {region_string!r}"
     try:
         sequence_name, coordinate_str = region_string.split(":")
@@ -58,7 +57,7 @@ def parse_region_string(region_string: str) -> tuple[str, Optional[int], Optiona
     if not start_str.isnumeric() or not end_str.isnumeric():
         raise ValueError(error_message)
     start, end = int(start_str) - 1, int(end_str)
-    return sequence_name, start, end
+    return sequence_name, (start, end)
 
 
 def normalize_region_string(region_string: str) -> str:
@@ -71,5 +70,5 @@ def normalize_region_string(region_string: str) -> str:
     >>> normalize_region_string("chr14")
     'chr14'
     """
-    sequence_name, start, end = parse_region_string(region_string)
-    return get_region_string(sequence_name, start, end)
+    sequence_name, interval = parse_region_string(region_string)
+    return get_region_string(sequence_name, interval)

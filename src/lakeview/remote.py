@@ -17,7 +17,7 @@ from ._region_string import (
 def download_bam(
     bam_url: str,
     output_bam_path: str,
-    region: Union[str, tuple[str, int, int], None] = None,
+    region: str | tuple[str, tuple[int, int]] | tuple[str, None] | None = None,
     *,
     index_url: Optional[str] = None,
     output_index_path: Optional[str] = None,
@@ -27,15 +27,20 @@ def download_bam(
     if index_url is None:
         index_url = bam_url + ".bai"
     if output_index_path is None:
-        output_index_path = output_bam_path + '.bai'
+        output_index_path = output_bam_path + ".bai"
     region_string: Optional[str]
     if region is None:
         region_string = None
     elif isinstance(region, str):
         region_string = normalize_region_string(region)
+    elif isinstance(region, tuple):
+        reference_name, interval = region
+        region_string = get_region_string(reference_name, interval)
     else:
-        region_string = get_region_string(*region)
-    
+        raise TypeError(
+            f"Invalid type for `region`: {type(region)!r}. Expecting str | tuple[str, tuple[int, int]] | tuple[str, None] | None."
+        )
+
     if not os.path.isfile(output_bam_path) or override:
         workdir = os.getcwd()
         with tempfile.TemporaryDirectory() as d:
@@ -44,7 +49,7 @@ def download_bam(
                 params = ["-X", "-b", bam_url, index_url]
                 if region_string:
                     params.append(region_string)
-                bam_data = pysam.view(*params) # type: ignore # pysam.view is not correctly typed. 
+                bam_data = pysam.view(*params)  # type: ignore # pysam.view is not correctly typed.
             finally:
                 os.chdir(workdir)
         target_dir = os.path.split(output_bam_path)[0]
@@ -54,4 +59,4 @@ def download_bam(
     if index and (not os.path.isfile(output_index_path) or override):
         target_dir = os.path.split(output_index_path)[0]
         pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
-        pysam.index(output_bam_path, output_index_path)  # type: ignore # pysam.index is not correctly typed. 
+        pysam.index(output_bam_path, output_index_path)  # type: ignore # pysam.index is not correctly typed.

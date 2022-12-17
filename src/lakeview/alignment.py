@@ -516,27 +516,30 @@ class SequenceAlignment(TrackPainter):
     def from_file(
         cls,
         file_path: str,
-        region: Union[str, tuple[str, Optional[int], Optional[int]]],
+        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
         *,
         mode: Optional[
             Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
         ] = None,
         **kw,
     ) -> SequenceAlignment:
+        '''
+        region: reference_name compulsory even if only one reference sequence exists for explicity
+        start and end coordinates are optional
+        samtools-compatible region string, or a two-element tuple containing reference name and a coordinate interval (start, end). If the coordinate interval is `None`, it will be assumed to be from the first base to the last base of the reference sequence
+        '''
         # Parse region
         reference_name: str
-        start: Optional[int] = None
-        end: Optional[int] = None
         normalized_region: str
         if isinstance(region, str):
-            reference_name, start, end = parse_region_string(region)
+            reference_name, interval = parse_region_string(region)
             normalized_region = normalize_region_string(region)
         elif isinstance(region, tuple):
-            reference_name = region[0]
-            normalized_region = get_region_string(*region)
+            reference_name, interval = region
+            normalized_region = get_region_string(reference_name, interval)
         else:
             raise TypeError(
-                f"Invalid value for `region`: {region!r}. Expecting a samtools-compatible region string, or a three-element tuple containing reference name and start and end coordinates. Start and end can both be None."
+                f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
             )
         with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
             reference_names: set[str] = set(alignment_file.references)
@@ -552,7 +555,7 @@ class SequenceAlignment(TrackPainter):
                 if seg.is_mapped
             ]
             if not segment_list:
-                raise ValueError("No aligned segments were found")
+                raise ValueError(f"No aligned segments found in {normalized_region!r}.")
             # Load pileup
             pileup_depths: dict[int, int] = {}
             pileup_bases: dict[int, collections.Counter[str]] = {}

@@ -11,11 +11,14 @@ def test_SKBR3():
     """
     These two BAM files have MD tag but no =/X CIGAR operations.
     """
+    CHROMOSOME = "17"
     ILLUMINA_BAM_PATH = "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam"
     PACBIO_BAM_PATH = "tests/data/SKBR3_PacBio.bam"
     OUTPUT_PNG_PATH = "tests/output/SKBR3_Illumina_PacBio.png"
-    illumina_painter = lv.SequenceAlignment.from_file(ILLUMINA_BAM_PATH, mode="rb")
-    pacbio_painter = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, mode="rb")
+    illumina_painter = lv.SequenceAlignment.from_file(
+        ILLUMINA_BAM_PATH, region=CHROMOSOME
+    )
+    pacbio_painter = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, region=CHROMOSOME)
 
     gv = lv.GenomeViewer(4, figsize=(12, 15), height_ratios=(1, 8, 1, 8))
     illumina_painter.draw_pileup(gv.axes[0])
@@ -53,7 +56,8 @@ def test_SKBR3():
         gv.axes[1],
         group_by=lambda seg: snp_tag(seg, 64_043_248),
         show_mismatches=True,
-        mismatches_kw=dict(linewidth=3), max_group_height=20
+        mismatches_kw=dict(linewidth=3),
+        max_group_height=20,
     )
     gv.set_xlim(64042997, 64043297)
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
@@ -61,9 +65,10 @@ def test_SKBR3():
 
 
 def test_GNAS_WES():
+    CHROMOSOME = "20"
     EXON_BAM_PATH = "tests/data/HG002_GNAS_Illumina_WES.bam"
     OUTPUT_SVG_PATH = "tests/output/GNAS_WES.svg"
-    painter = lv.SequenceAlignment.from_file(EXON_BAM_PATH, mode="rb")
+    painter = lv.SequenceAlignment.from_file(EXON_BAM_PATH, CHROMOSOME)
     painter.segments = [seg for i, seg in enumerate(painter.segments) if i % 20 == 0]
     assert len(painter.segments) == 754
 
@@ -72,7 +77,6 @@ def test_GNAS_WES():
     painter.draw_alignment(
         gv.axes[1], show_mismatches=False, show_arrowheads=False, max_group_height=30
     )
-
     gv.set_xlabel("chr20")
     gv.set_title("HG002 GNAS Illumina WES")
     gv.savefig(OUTPUT_SVG_PATH)
@@ -89,12 +93,12 @@ def test_IGH():
 
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
         gencode_painter = lv.GeneAnnotation.from_gencode_gtf(
-            file_object=f,
-            chromosome=CHROMOSOME,
-            start=START,
-            end=END,
+            f,
+            region=(CHROMOSOME, (START, END))
         )
-    pacbio_painter = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, mode="rb")
+    pacbio_painter = lv.SequenceAlignment.from_file(
+        PACBIO_BAM_PATH, region=(CHROMOSOME, (START, END)), mode="rb"
+    )
 
     gv = lv.GenomeViewer(3, height_ratios=(1, 8, 2))
     pacbio_painter.draw_pileup(
@@ -119,15 +123,15 @@ def test_IGH():
 
 
 def test_GAPDH_RNAseq():
-    CHROMOSOME, START, END = "chr12", 6.643e6, 6.648e6
+    CHROMOSOME, START, END = "chr12", int(6.643e6), int(6.648e6)
     RNA_BAM_PATH = "tests/data/GM12878_RNAseq_GAPDH.sample=0.002.bam"
     REFSEQ_GFF_PATH = "tests/data/Refseq_GRCh37_genomic_annotation.gff.gz"
     OUTPUT_PNG_PATH = "tests/output/GM12878_RNAseq_GAPDH.png"
 
-    alignment_painter = lv.SequenceAlignment.from_file(RNA_BAM_PATH)
+    alignment_painter = lv.SequenceAlignment.from_file(RNA_BAM_PATH, CHROMOSOME)
     with gzip.open(REFSEQ_GFF_PATH, "rt") as f:
         annotation_painter = lv.GeneAnnotation.from_refseq_gff(
-            file_object=f, build="GRCh37", chromosome=CHROMOSOME, start=START, end=END
+            f, region=(CHROMOSOME, (START, END)), build="GRCh37"
         )
 
     gv = lv.GenomeViewer(3, figsize=(8, 8), height_ratios=(1, 7, 2))
@@ -154,9 +158,10 @@ def test_GAPDH_RNAseq():
 
 
 def test_SNURF_methylation():
+    CHROMOSOME = 'chr15'
     PACBIO_BAM_PATH = "tests/data/HG002_GRCh38_SNURF_haplotagged.bam"
     OUTPUT_PNG_PATH = "tests/output/SNURF_methylation.png"
-    p = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH)
+    p = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, CHROMOSOME)
     fig, ax = plt.subplots(figsize=(8, 5))
     p.draw_alignment(
         ax,
