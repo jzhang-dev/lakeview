@@ -111,13 +111,10 @@ class GeneAnnotation:
         # Parse region
         sequence_name: str
         interval: tuple[int, int] | None
-        normalized_region: str
         if isinstance(region, str):
             sequence_name, interval = parse_region_notation(region)
-            normalized_region = normalize_region_notation(region)
         elif isinstance(region, tuple):
             sequence_name, interval = region
-            normalized_region = get_region_notation(sequence_name, interval)
         else:
             raise TypeError(
                 f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
@@ -237,13 +234,13 @@ class GeneAnnotation:
         if format_ == 'gtf':
             transcript_key = "transcript_id"
             parent_transcript_key = "transcript_id"
-            gene_key = "gene_id"
-            parent_gene_key = "gene_id"
+            # gene_key = "gene_id"
+            # parent_gene_key = "gene_id"
         elif format_ == 'gff3':
             transcript_key = "ID"
             parent_transcript_key = "Parent"
-            gene_key = "ID"
-            parent_gene_key = "Parent"
+            # gene_key = "ID" 
+            # parent_gene_key = "Parent"
         # Identify genes, transcripts, exons, cdss
         genes, transcripts, exons, cdss = [], [], [], []
         for record in records:

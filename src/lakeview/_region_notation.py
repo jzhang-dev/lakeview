@@ -4,6 +4,8 @@
 from __future__ import annotations
 from typing import Optional, Union
 
+# Consider: make this module public
+
 
 def get_region_notation(sequence_name, interval: Optional[tuple[int, int]] = None) -> str:
     """
