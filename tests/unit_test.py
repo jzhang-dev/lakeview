@@ -12,7 +12,7 @@ import lakeview as lv
 # TODO: load user supplied reference sequence.
 
 
-def test_load_bam() -> None:
+def test_load_local_bam() -> None:
     CHROMOSOME = "17"
     p = lv.SequenceAlignment.from_file(
         "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam", CHROMOSOME
@@ -30,6 +30,12 @@ def test_load_bam() -> None:
             "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam",
             region="1",
         )
+
+
+def test_load_remote_bam() -> None:
+    BAM_URL = "https://s3.amazonaws.com/igv.org.demo/SKBR3/SKBR3_550bp_pcrFREE_S1_L001_AND_L002_R1_001.101bp.bwamem.ill.mapped.sort.bam"
+    p = lv.SequenceAlignment.from_remote(BAM_URL, region="17:64040802-64045633")
+    assert len(p.segments) == 1800
 
 
 def test_download_bam() -> None:

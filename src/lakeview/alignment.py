@@ -2,8 +2,6 @@
 # coding: utf-8
 
 from __future__ import annotations
-import collections
-
 from typing import (
     Callable,
     Optional,
@@ -15,6 +13,9 @@ from collections.abc import (
     Sequence,
     Mapping,
 )
+import collections
+import os
+import tempfile
 from dataclasses import dataclass
 import warnings
 import functools
@@ -492,7 +493,7 @@ class SequenceAlignment(TrackPainter):
 
     def __init__(
         self,
-        reference_name:str,
+        reference_name: str,
         segments: list[AlignedSegment],
         pileup_depths: dict[int, int],
         pileup_bases: dict[int, collections.Counter[str]],
@@ -503,31 +504,11 @@ class SequenceAlignment(TrackPainter):
         self.reference_name = reference_name
 
     @classmethod
-    def from_pysam(
+    def _from_pysam(
         cls,
         alignment_file: pysam.AlignmentFile,
-        region: Union[str, tuple[str, int, int], None] = None,
-        **kw,
-    ):
-
-        pass
-
-    @classmethod
-    def from_file(
-        cls,
-        file_path: str,
         region: str | tuple[str, tuple[int, int]] | tuple[str, None],
-        *,
-        mode: Optional[
-            Literal["r", "w", "wh", "rb", "wb", "wbu", "wb0", "rc", "wc"]
-        ] = None,
-        **kw,
-    ) -> SequenceAlignment:
-        '''
-        region: reference_name compulsory even if only one reference sequence exists for explicity
-        start and end coordinates are optional
-        samtools-compatible region string, or a two-element tuple containing reference name and a coordinate interval (start, end). If the coordinate interval is `None`, it will be assumed to be from the first base to the last base of the reference sequence
-        '''
+    ):
         # Parse region
         reference_name: str
         normalized_region: str
@@ -541,60 +522,86 @@ class SequenceAlignment(TrackPainter):
             raise TypeError(
                 f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
             )
-        with pysam.AlignmentFile(file_path, mode, **kw) as alignment_file:
-            reference_names: set[str] = set(alignment_file.references)
-            # Check `reference_name`
-            if reference_name not in reference_names:
-                raise ValueError(
-                    f"Reference name {reference_name!r} is not found. Expecting one of {reference_names!r}"
-                )
-            # Load segments
-            segment_list: list[AlignedSegment] = [
-                AlignedSegment(seg)
-                for seg in alignment_file.fetch(region=normalized_region)
-                if seg.is_mapped
-            ]
-            if not segment_list:
-                raise ValueError(f"No aligned segments found in {normalized_region!r}.")
-            # Load pileup
-            pileup_depths: dict[int, int] = {}
-            pileup_bases: dict[int, collections.Counter[str]] = {}
-            for col in alignment_file.pileup(region=normalized_region):
-                position: int = col.reference_pos
-                query_bases: list[str] = [
-                    b.upper() for b in col.get_query_sequences() if b
-                ]
-                pileup_depths[position] = len(
-                    query_bases
-                )  # col.nsegments includes reference skips; use len(query_bases) instead
-                base_counter = collections.Counter(query_bases)
-                if len(base_counter) > 1:
-                    pileup_bases[position] = base_counter
-            # If a position has no coverage, there will be no columns corresponding to that position.
-            # Need to manually add zeros to the pileup_depths for correct plotting
-            sorted_pileup_depths: dict[int, int] = {}
-            for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
-                sorted_pileup_depths[position] = pileup_depths.get(position, 0)
-            pileup_depths = sorted_pileup_depths
-
-            return cls(
-                reference_name=reference_name,
-                segments=segment_list,
-                pileup_depths=pileup_depths,
-                pileup_bases=pileup_bases,
+        # Check `reference_name`
+        reference_names: set[str] = set(alignment_file.references)
+        if reference_name not in reference_names:
+            raise ValueError(
+                f"Reference name {reference_name!r} is not found. Expecting one of {reference_names!r}"
             )
+        # Load segments
+        segment_list: list[AlignedSegment] = [
+            AlignedSegment(seg)
+            for seg in alignment_file.fetch(region=normalized_region)
+            if seg.is_mapped
+        ]
+        if not segment_list:
+            raise ValueError(f"No aligned segments found in {normalized_region!r}.")
+        # Load pileup
+        pileup_depths: dict[int, int] = {}
+        pileup_bases: dict[int, collections.Counter[str]] = {}
+        pileup_column: pysam.PileupColumn
+        for pileup_column in alignment_file.pileup(region=normalized_region):
+            position: int = pileup_column.reference_pos
+            query_bases: list[str] = [
+                b.upper() for b in pileup_column.get_query_sequences() if b
+            ]
+            pileup_depths[position] = len(
+                query_bases
+            )  # col.nsegments includes reference skips; use len(query_bases) instead
+            base_counter = collections.Counter(query_bases)
+            if len(base_counter) > 1:
+                pileup_bases[position] = base_counter
+        # If a position has no coverage, there will be no columns corresponding to that position.
+        # Need to manually add zeros to the pileup_depths for correct plotting
+        # TODO: Performance: move this to draw_pileup()
+        sorted_pileup_depths: dict[int, int] = {}
+        for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
+            sorted_pileup_depths[position] = pileup_depths.get(position, 0)
+        pileup_depths = sorted_pileup_depths
+
+        return cls(
+            reference_name=reference_name,
+            segments=segment_list,
+            pileup_depths=pileup_depths,
+            pileup_bases=pileup_bases,
+        )
+
+    @classmethod
+    def from_file(
+        cls,
+        file_path: str,  # Pysam does not support reading and writing from true python file objects. See https://pysam.readthedocs.io/en/latest/usage.html#using-streams
+        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        **kw,
+    ):
+        """
+        region: reference_name compulsory even if only one reference sequence exists for explicity
+        start and end coordinates are optional
+        samtools-compatible region string, or a two-element tuple containing reference name and a coordinate interval (start, end). If the coordinate interval is `None`, it will be assumed to be from the first base to the last base of the reference sequence
+        """
+        with pysam.AlignmentFile(
+            file_path, mode="rb", require_index=True, **kw
+        ) as alignment_file:
+            return cls._from_pysam(alignment_file, region=region)
 
     @classmethod
     def from_remote(
         cls,
-        bam_url,
-        region: Union[str, tuple[str, int, int], None] = None,
+        url: str,
+        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
         *,
-        index_url: Optional[str] = None,
-        reference_sequence: Optional[str] = None,
+        index_url: str | None = None,
         **kw,
-    ):  # TODO
-        pass
+    ):
+        workdir = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            try:
+                os.chdir(d)  # Change workdir before index file is downloaded
+                with pysam.AlignmentFile(
+                    url, mode="rb", require_index=True, index_filename=index_url, **kw
+                ) as alignment_file:
+                    return cls._from_pysam(alignment_file, region=region)
+            finally:
+                os.chdir(workdir)
 
     @staticmethod
     def _link_segments(

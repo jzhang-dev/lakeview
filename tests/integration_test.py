@@ -98,7 +98,7 @@ def test_IGH():
             region=(CHROMOSOME, (START, END))
         )
     pacbio_painter = lv.SequenceAlignment.from_file(
-        PACBIO_BAM_PATH, region=(CHROMOSOME, (START, END)), mode="rb"
+        PACBIO_BAM_PATH, region=(CHROMOSOME, (START, END))
     )
 
     gv = lv.GenomeViewer(3, height_ratios=(1, 8, 2))
