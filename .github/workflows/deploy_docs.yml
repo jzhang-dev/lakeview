@@ -34,15 +34,17 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.8' 
-      - name: Install with pip
+      - name: Install Lakeview with pip
         run: |
           pip install -v .
+      - name: Install doc dependences with pip
+        run: |
+          pip install -v -r docs/requirements.txt
       - name: Setup Pages
         uses: actions/configure-pages@v2
-      - name: Sphinx Build
-        uses: ammaraskar/sphinx-action@0.4
-        with:
-          docs-folder: docs/
+      - name: Build docs with Sphnix
+        run: |
+          cd docs && make html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
