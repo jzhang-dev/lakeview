@@ -4,22 +4,29 @@ image:
 tasks:
   - name: Install development dependencies
     init: |
-      pip install -v -r dev/requirements.txt
+      pip install -v -r dev/requirements.txt &&
+      gp sync-done dev_dependencies
 
   - name: Install Lakeview for development
     init: | 
+      gp sync-await dev_dependencies && 
       pip install -ve .
 
   - name: Install jupyterlab-horizon-theme
-    init: pip install git+https://github.com/jzhang-dev/jupyterlab-horizon-theme
+    init: | 
+      gp sync-await dev_dependencies && 
+      pip install git+https://github.com/jzhang-dev/jupyterlab-horizon-theme &&
+      gp sync-done jupyterlab_theme
 
   - name: Run JupyterLab
+    init: gp sync-await jupyterlab_theme
     command: |
-      mkdir -p /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings
-      cp dev/jupyterlab_settings/overrides.json /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings/overrides.json
+      mkdir -p /workspace/.pyenv_mirror/user/current/share/jupyter/lab/settings
+      cp dev/jupyterlab_settings/overrides.json /workspace/.pyenv_mirror/user/current/share/jupyter/lab/settings/overrides.json
       jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
 
   - name: Run HTTP server
+    init: gp sync-await dev_dependencies
     command: cd docs && python3 -m http.server 8000
 
 ports:
