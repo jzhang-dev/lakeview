@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+"""Test docstring for annotation.py"""
+
 from __future__ import annotations
 from typing import (
     Callable,

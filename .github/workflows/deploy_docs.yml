@@ -36,6 +36,7 @@ jobs:
         uses: ammaraskar/sphinx-action@0.4
         with:
           docs-folder: docs/
+          pre-build-command: "pip install -v . && pip install sphinx-book-theme"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:

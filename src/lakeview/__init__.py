@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+"""Test docstring for __init__"""
+
 __author__ = "Jia-Yuan Zhang"
 __email__ = "jzhang@well.ox.ac.uk"
 
@@ -9,3 +11,5 @@ from .annotation import GeneAnnotation
 from .sequence import DotPlot
 from .widget import GenomeViewer
 from . import util, helpers, remote
+
+
