@@ -15,6 +15,7 @@ A quick example:
 
 - **Clear figures**. Lakeview inherits the familiar and intuitive visual style of [IGV](https://software.broadinstitute.org/software/igv/), with clear texts and symbols designed for publication and presentation. 
 - **Programmable plotting**. Multiple files and genomic regions can be visualized automatically through a Pythonic interface inspired by [Seaborn](https://seaborn.pydata.org/) and [Pandas](https://pandas.pydata.org/).
+- **Support for remote data**. Genomic data are often stored in remote servers without display devices. With Lakeview, you can plot remotely and view the output figures locally. Lakeview works well with [JupyterLab](https://jupyterlab.readthedocs.io/en/stable/) to streamline this workflow. 
 - **Transparency and reproduciblity**. Figures are transparently defined in the code, eliminating the need for manual annotation.
 - **Customizable layouts**. Lakeview supports many layouts implemented in [IGV](https://software.broadinstitute.org/software/igv/), while allowing the user to define custom rules for ordering, groupping, and coloring each segment. Advanced customization is possible via the [Matplotlib](https://matplotlib.org/) API.
 
