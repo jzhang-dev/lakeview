@@ -2,6 +2,10 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
+  - name: Install development dependencies
+    init: |
+      pip install -v -r dev/requirements.txt
+
   - name: Install Lakeview for development
     init: | 
       pip install -ve .
@@ -9,7 +13,6 @@ tasks:
   - name: Install jupyterlab-horizon-theme
     init: pip install git+https://github.com/jzhang-dev/jupyterlab-horizon-theme
 
-    
   - name: Run JupyterLab
     command: |
       mkdir -p /home/gitpod/.pyenv/versions/3.8.13/share/jupyter/lab/settings
@@ -17,7 +20,7 @@ tasks:
       jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
 
   - name: Run HTTP server
-    command: cd docs && python -m http.server 8000
+    command: cd docs && python3 -m http.server 8000
 
 ports:
   - name: JupyterLab
