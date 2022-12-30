@@ -6,6 +6,8 @@
 Welcome to Lakeview's documentation!
 ====================================
 
+This is the documentation of Lakeview, which is currently under development and will be released by summer 2023. 
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
