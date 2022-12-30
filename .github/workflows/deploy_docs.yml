@@ -1,5 +1,5 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Build docs with Sphinx and deploy to GitHub Pages
 
 on:
   # Runs on pushes targeting the default branch
@@ -39,7 +39,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: '.'
+          path: docs/_build/html/
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
