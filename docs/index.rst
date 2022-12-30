@@ -12,6 +12,10 @@ This is the documentation of Lakeview, which is currently under development and 
    :maxdepth: 2
    :caption: Contents:
 
+   usage
+   api
+
+
 
 
 Indices and tables
@@ -20,21 +24,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-
-API
-==================
-.. automodule:: lakeview
-   :members:
-
-.. automodule:: lakeview.alignment
-   :members:
-
-.. automodule:: lakeview.annotation
-   :members:
-
-.. automodule:: lakeview.remote
-   :members:
-
-.. automodule:: lakeview.plot
-   :members:

@@ -488,6 +488,9 @@ class _LinkedSegment:
 
 
 class SequenceAlignment(TrackPainter):
+    """
+    Plot sequence alignment from BAM files.
+    """
     reference_name: str
     segments: list[AlignedSegment]
     pileup_depths: dict[int, int]
