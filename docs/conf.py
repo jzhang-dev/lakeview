@@ -6,35 +6,50 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Lakeview'
-copyright = '2022, Jia-Yuan Zhang'
-author = 'Jia-Yuan Zhang'
-release = '0.1'
+project = "Lakeview"
+copyright = "2022, Jia-Yuan Zhang"
+author = "Jia-Yuan Zhang"
+release = "0.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.autodoc', "myst_nb", "IPython.sphinxext.ipython_console_highlighting"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "myst_nb",
+    "IPython.sphinxext.ipython_console_highlighting",
+]
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.ipynb': 'myst-nb',
+    ".rst": "restructuredtext",
+    ".ipynb": "myst-nb",
 }
 
-#templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
-
+# templates_path = ['_templates']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_book_theme'
-#html_static_path = ['_static']
+html_theme = "sphinx_book_theme"
+# html_static_path = ['_static']
 
 # -- Options for autodoc -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#module-sphinx.ext.autodoc
 
-autodoc_typehints = 'description'
+autodoc_typehints = "description"
+autodoc_class_signature = "separated"
+
+autodoc_default_options = {
+    "member-order": "bysource",
+    "show-inheritance": True,
+}
+
+# -- Options for Intersphinx -------------------------------------------------
+intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
+
+
 
 # -- Options for mysb-nb -------------------------------------------------
 # https://myst-nb.readthedocs.io/en/latest/computation/execute.html

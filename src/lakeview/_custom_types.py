@@ -6,9 +6,12 @@ from typing import Union, Literal, Tuple, Sequence
 from collections.abc import Hashable
 import matplotlib as mpl
 
-NativeHashable = Union[int, float, str, Tuple[Hashable, ...], frozenset]
-GroupIdentifier = NativeHashable
-LinkIdentifier = NativeHashable
+Identifier = Union[int , float , str , Tuple[Union[int, float, str]]]
+"Identifier"
+LinkIdentifier = Identifier
+"Link identifier"
+GroupIdentifier = Identifier
+"Group identifier"
 Color = Union[Tuple[float, float, float], Tuple[float, float, float, float], str]
 Position = Union[int, float]
 Point = Tuple[float, float]

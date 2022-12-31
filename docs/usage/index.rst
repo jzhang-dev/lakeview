@@ -5,8 +5,8 @@ Usage
    :maxdepth: 2
    :caption: Contents:
 
-   usage/test
-   usage/HG002_IGH
+   test
+   HG002_IGH
 
    
 

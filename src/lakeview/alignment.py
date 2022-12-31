@@ -37,7 +37,7 @@ from ._region_notation import (
     get_region_notation,
 )
 from ._custom_types import (
-    NativeHashable,
+    Identifier,
     GroupIdentifier,
     LinkIdentifier,
     Color,
@@ -299,19 +299,27 @@ class CIGAR:
         )
 
 
-# A wrapper around pysam.AlignedSegment
 @dataclass(init=False)
 class AlignedSegment:
+    """
+    A wrapper around pysam.AlignedSegment
+    """
     wrapped: pysam.AlignedSegment
     reference_start: int
     reference_end: int
 
     def __init__(self, wrapped: pysam.AlignedSegment):
+        """
+        :param wrapped: an instance of pysam.AlignedSegment.
+        """
         self.wrapped = wrapped
+        "The wrapped pysam.AlignedSegment object"
         if wrapped.reference_start is None or wrapped.reference_end is None:
             raise ValueError()
         self.reference_start = wrapped.reference_start
+        "0-based leftmost coordinate of the aligned reference position of the segment; alias for `wrapped.reference_start`."
         self.reference_end = wrapped.reference_end
+        "0-based coordinate of one past the last aligned residue of the segment; alias for `wrapped.reference_end`."
         if wrapped.query_name is None:
             raise ValueError()
         self.query_name: str = wrapped.query_name
@@ -781,7 +789,7 @@ class SequenceAlignment(TrackPainter):
                 warnings.warn("All segments removed after filtering.")
 
         # Sort segments
-        keys: list[NativeHashable] = []
+        keys: list[Identifier] = []
         if sort_by == "start":
             keys = [seg.reference_start for seg in segments]
         elif sort_by == "length":
@@ -822,8 +830,8 @@ class SequenceAlignment(TrackPainter):
         ax,
         *,
         sort_by: Union[
-            Callable[[AlignedSegment], NativeHashable],
-            Iterable[NativeHashable],
+            Callable[[AlignedSegment], Identifier],
+            Iterable[Identifier],
             Literal["length", "start"],
             None,
         ] = None,

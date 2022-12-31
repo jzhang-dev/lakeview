@@ -11,11 +11,11 @@ from numbers import Real
 import matplotlib as mpl
 from matplotlib.colors import rgb2hex
 import pysam
-from ._custom_types import Color, NativeHashable
+from ._custom_types import Color, Identifier
 
 
 def sort_by_keys(
-    *iterables: Sequence, keys: Sequence[NativeHashable], reverse: bool = False
+    *iterables: Sequence, keys: Sequence[Identifier], reverse: bool = False
 ) -> list[list]:
     """
     Sort multiple equal-length sequences by the value of another sequences.

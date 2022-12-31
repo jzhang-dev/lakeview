@@ -15,7 +15,7 @@ from ._region_notation import (
 )
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
 from .plot import get_ax_size
-from ._custom_types import GroupIdentifier, Color, Axes, NativeHashable
+from ._custom_types import GroupIdentifier, Color, Axes, Identifier
 
 
 @dataclass
@@ -481,7 +481,7 @@ class GeneAnnotation:
                 warnings.warn("All segments removed after filtering.")
 
         # Sort transcripts
-        keys: list[NativeHashable] = []
+        keys: list[Identifier] = []
         if sort_by is None:
             pass
         elif sort_by == "length":
@@ -504,8 +504,8 @@ class GeneAnnotation:
         ax: Axes,
         *,
         sort_by: Union[
-            Callable[[AnnotationRecord], NativeHashable],
-            Iterable[NativeHashable],
+            Callable[[AnnotationRecord], Identifier],
+            Iterable[Identifier],
             Literal["length"],
             None,
         ] = None,
