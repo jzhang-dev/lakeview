@@ -18,6 +18,11 @@ tasks:
       pip install git+https://github.com/jzhang-dev/jupyterlab-horizon-theme &&
       gp sync-done jupyterlab_theme
 
+  - name: Build docs
+    init: |
+      gp sync-await dev_dependencies && 
+      sphinx-build -W --keep-going -E -b html docs/ docs/_build/html
+
   - name: Run JupyterLab
     init: gp sync-await jupyterlab_theme
     command: |
