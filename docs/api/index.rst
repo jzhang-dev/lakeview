@@ -9,6 +9,7 @@ API
    GeneAnnotation
    plot
    remote
+   type_alias
 
 
 

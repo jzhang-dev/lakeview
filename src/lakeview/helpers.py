@@ -11,7 +11,7 @@ from numbers import Real
 import matplotlib as mpl
 from matplotlib.colors import rgb2hex
 import pysam
-from ._custom_types import Color, Identifier
+from ._type_alias import Color, Identifier
 
 
 def sort_by_keys(

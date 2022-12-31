@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-"""Test docstring for __init__"""
-
 __author__ = "Jia-Yuan Zhang"
 __email__ = "jzhang@well.ox.ac.uk"
 
-from .alignment import AlignedSegment, SequenceAlignment
-from .annotation import GeneAnnotation
+
+from . import alignment, annotation, util, helpers, remote, widget
 from .sequence import DotPlot
-from .widget import GenomeViewer
-from . import util, helpers, remote
 
 
+SequenceAlignment = alignment.SequenceAlignment
+GeneAnnotation = annotation.GeneAnnotation
+GenomeViewer = widget.GenomeViewer

@@ -33,6 +33,12 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_book_theme"
+html_theme_options = {
+    "repository_url": "https://github.com/jzhang-dev/lakeview",
+    "use_repository_button": True,
+    "use_fullscreen_button": False,
+
+}
 # html_static_path = ['_static']
 
 # -- Options for autodoc -------------------------------------------------
@@ -45,9 +51,10 @@ autodoc_default_options = {
     "member-order": "bysource",
     "show-inheritance": True,
 }
+autodoc_type_aliases = {'GroupIdentifier': "lakeview._type_alias.GroupIdentifier"}
 
 # -- Options for Intersphinx -------------------------------------------------
-intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
+intersphinx_mapping = {"python": ("https://docs.python.org/3", None), "pysam": ("https://pysam.readthedocs.io/en/latest", None)}
 
 
 

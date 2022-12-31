@@ -5,5 +5,11 @@ lakeview.GeneAnnotation
    :maxdepth: 2
    :caption: Contents:
 
-.. automodule:: lakeview.annotation
+
+.. automodule:: lakeview
    :members: GeneAnnotation
+   :noindex:
+
+.. automodule:: lakeview.annotation
+   :members: AnnotationRecord
+

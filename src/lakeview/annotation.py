@@ -15,8 +15,7 @@ from ._region_notation import (
 )
 from .helpers import filter_by_keys, sort_by_keys, pack_intervals
 from .plot import get_ax_size
-from ._custom_types import GroupIdentifier, Color, Axes, Identifier
-
+from ._type_alias import GroupIdentifier, Color, Axes, Identifier
 
 @dataclass
 class AnnotationRecord:
@@ -365,7 +364,7 @@ class GeneAnnotation:
         gene_height=None,
         show_labels=True,
         labels_kw={},
-    ):
+    ): 
         genes = self.genes
         intervals = [(g.start, g.end) for g in genes]
         if allow_overlaps:

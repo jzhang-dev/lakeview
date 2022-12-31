@@ -36,7 +36,7 @@ from ._region_notation import (
     normalize_region_notation,
     get_region_notation,
 )
-from ._custom_types import (
+from ._type_alias import (
     Identifier,
     GroupIdentifier,
     LinkIdentifier,
@@ -198,7 +198,7 @@ class HardClippedBases(ClippedBases):
 
 
 @dataclass
-class CIGAR:
+class _CIGAR:
     alignment_matches: list[AlignmentMatch]
     insertions: list[Insertion]
     deletions: list[Deletion]
@@ -209,9 +209,9 @@ class CIGAR:
 
     @classmethod
     def from_aligned_segment(cls, segment: AlignedSegment):
-        if segment.cigartuples is None:
+        if segment._cigartuples is None:
             raise ValueError("Segment is not aligned.")
-        cigartuples: list[tuple[int, int]] = segment.cigartuples
+        cigartuples: list[tuple[int, int]] = segment._cigartuples
         alignment_matches = []
         insertions = []
         deletions = []
@@ -310,38 +310,51 @@ class AlignedSegment:
 
     def __init__(self, wrapped: pysam.AlignedSegment):
         """
-        :param wrapped: an instance of pysam.AlignedSegment.
+        :param wrapped: an instance of :external:py:class:`pysam.AlignedSegment`.
         """
         self.wrapped = wrapped
-        "The wrapped pysam.AlignedSegment object"
+        "the wrapped :external:py:class:`pysam.AlignedSegment` instance."
         if wrapped.reference_start is None or wrapped.reference_end is None:
             raise ValueError()
         self.reference_start = wrapped.reference_start
-        "0-based leftmost coordinate of the aligned reference position of the segment; alias for `wrapped.reference_start`."
+        "0-based coordinate of the first aligned reference position of the segment; alias of :external:py:attr:`pysam.AlignedSegment.reference_start`"
         self.reference_end = wrapped.reference_end
-        "0-based coordinate of one past the last aligned residue of the segment; alias for `wrapped.reference_end`."
+        "0-based coordinate of one past the last aligned reference position of the segment; alias of :external:py:attr:`pysam.AlignedSegment.reference_end`"
         if wrapped.query_name is None:
             raise ValueError()
         self.query_name: str = wrapped.query_name
+        "alias of :external:py:attr:`pysam.AlignedSegment.query_name`"
         self.is_forward: bool = wrapped.is_forward  # type: ignore
+        "alias of :external:py:attr:`pysam.AlignedSegment.is_forward`"
         self.is_reverse: bool = not self.is_forward
+        "alias of :external:py:attr:`pysam.AlignedSegment.is_reverse`"
         self.is_proper_pair: bool = wrapped.is_proper_pair
+        "alias of :external:py:attr:`pysam.AlignedSegment.is_proper_pair`"
         self.is_secondary: bool = wrapped.is_secondary
+        "alias of :external:py:attr:`pysam.AlignedSegment.is_secondary`"
         self.is_supplementary: bool = wrapped.is_supplementary
+        "alias of :external:py:attr:`pysam.AlignedSegment.is_secondary`"
         self.is_mapped: bool = wrapped.is_mapped  # type: ignore
+        "alias of :external:py:attr:`pysam.AlignedSegment.is_mapped`"
         self.query_alignment_length: int = wrapped.query_alignment_length
+        "alias of :external:py:attr:`pysam.AlignedSegment.query_alignment_length`"
 
-        if self.cigartuples is not None:
-            self.cigar = CIGAR.from_aligned_segment(self)
+        if self._cigartuples is not None:
+            self._cigar: _CIGAR = _CIGAR.from_aligned_segment(self)
+            "alignment patterns recorded in the CIGAR string"
+        else:
+            raise ValueError("CIGAR not found.")
 
-    def has_tag(self, tag: str):
+    def has_tag(self, tag: str) -> bool:
+        "alias of :external:py:meth:`pysam.AlignedSegment.has_tag`"
         return self.wrapped.has_tag(tag)
 
     def get_tag(self, tag: str):
+        "alias of :external:py:meth:`pysam.AlignedSegment.get_tag`"
         return self.wrapped.get_tag(tag)
 
     @property
-    def cigartuples(self):
+    def _cigartuples(self):
         return self.wrapped.cigartuples
 
     @functools.cached_property
@@ -401,23 +414,23 @@ class AlignedSegment:
 
     @property
     def alignment_matches(self) -> list[AlignmentMatch]:
-        return self.cigar.alignment_matches
+        return self._cigar.alignment_matches
 
     @property
     def insertions(self):
-        return self.cigar.insertions
+        return self._cigar.insertions
 
     @property
     def deletions(self):
-        return self.cigar.deletions
+        return self._cigar.deletions
 
     @property
     def soft_clipping(self):
-        return self.cigar.soft_clippings
+        return self._cigar.soft_clippings
 
     @property
     def hard_clipping(self):
-        return self.cigar.hard_clippings
+        return self._cigar.hard_clippings
 
     def _get_md_mismatched_bases(self) -> list[MdMismatchedBase]:
         query_sequence = self.query_sequence
@@ -438,9 +451,10 @@ class AlignedSegment:
         return mismatched_bases
 
     @functools.cached_property
-    def mismatched_bases(self) -> list[_MismatchedBase]:
-        if self.cigar.mismatched_bases:
-            mismatched_bases = self.cigar.mismatched_bases
+    def mismatched_bases(self) -> Sequence[_MismatchedBase]:
+        mismatched_bases: Sequence[_MismatchedBase]
+        if self._cigar.mismatched_bases:
+            mismatched_bases = self._cigar.mismatched_bases
         elif self.has_tag("MD"):
             mismatched_bases = self._get_md_mismatched_bases()
         else:
@@ -479,7 +493,7 @@ class AlignedSegment:
 
     @property
     def reference_skips(self) -> list[ReferenceSkip]:
-        return self.cigar.reference_skips
+        return self._cigar.reference_skips
 
 
 @dataclass

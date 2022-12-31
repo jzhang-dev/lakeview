@@ -6,9 +6,9 @@ lakeview.SequenceAlignment
    :caption: Contents:
 
 
+.. automodule:: lakeview
+   :members: SequenceAlignment
+   :noindex:
 
 .. automodule:: lakeview.alignment
-   :members:
-
-.. automodule:: lakeview._custom_types
-   :members: LinkIdentifier, GroupIdentifier
+   :members: AlignedSegment

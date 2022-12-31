@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex
-from ._custom_types import Color, Point, Axes
+from ._type_alias import Color, Point, Axes
 
 
 def get_cmap_colors(
