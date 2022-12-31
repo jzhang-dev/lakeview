@@ -22,6 +22,10 @@ Try Lakeview interactively with Binder:
 
 ## Installation
 
+## Documentation
+
+Lakeview documentation is available at https://jzhang-dev.github.io/lakeview/.
+
 ## Contribute
 
 Issues and pull requests are welcome via [GitHub](https://github.com/jzhang-dev/lakeview/).
