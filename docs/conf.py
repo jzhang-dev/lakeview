@@ -14,7 +14,7 @@ release = '0.1'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.autodoc', "myst_nb"]
+extensions = ['sphinx.ext.autodoc', "myst_nb", "IPython.sphinxext.ipython_console_highlighting"]
 source_suffix = {
     '.rst': 'restructuredtext',
     '.ipynb': 'myst-nb',
@@ -35,3 +35,9 @@ html_theme = 'sphinx_book_theme'
 # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#module-sphinx.ext.autodoc
 
 autodoc_typehints = 'description'
+
+# -- Options for mysb-nb -------------------------------------------------
+# https://myst-nb.readthedocs.io/en/latest/computation/execute.html
+
+nb_execution_mode = "cache"
+nb_execution_timeout = 600
