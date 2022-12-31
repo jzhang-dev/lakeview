@@ -51,7 +51,7 @@ autodoc_default_options = {
     "member-order": "bysource",
     "show-inheritance": True,
 }
-autodoc_type_aliases = {'GroupIdentifier': "lakeview._type_alias.GroupIdentifier"}
+#autodoc_type_aliases = {'GroupIdentifier': "lakeview._type_alias.GroupIdentifier"}
 
 # -- Options for Intersphinx -------------------------------------------------
 intersphinx_mapping = {"python": ("https://docs.python.org/3", None), "pysam": ("https://pysam.readthedocs.io/en/latest", None)}

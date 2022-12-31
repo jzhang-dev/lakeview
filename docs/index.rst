@@ -16,11 +16,3 @@ This is the documentation of Lakeview, which is currently under development and 
    api/index
 
 
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

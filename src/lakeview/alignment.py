@@ -49,19 +49,7 @@ from ._type_alias import (
 )
 
 
-# TODO: Get query sequence by position
-# TODO: Max depth marker
-
-
-class TrackPainter:
-    pass
-
-
-class Chromosome(TrackPainter):
-    pass
-
-
-class CoverageDepth(TrackPainter):
+class CoverageDepth:
     @classmethod
     def from_samtools_depth_output(self, file):
         pass
@@ -79,10 +67,6 @@ class CigarOperation:
         if reference_start is None:
             raise ValueError("Segment is not aligned.")
         return reference_start + self.reference_offset
-
-
-class AlignmentMatch(CigarOperation):
-    pass
 
 
 class Insertion(CigarOperation):
@@ -199,7 +183,6 @@ class HardClippedBases(ClippedBases):
 
 @dataclass
 class _CIGAR:
-    alignment_matches: list[AlignmentMatch]
     insertions: list[Insertion]
     deletions: list[Deletion]
     reference_skips: list[ReferenceSkip]
@@ -212,7 +195,6 @@ class _CIGAR:
         if segment._cigartuples is None:
             raise ValueError("Segment is not aligned.")
         cigartuples: list[tuple[int, int]] = segment._cigartuples
-        alignment_matches = []
         insertions = []
         deletions = []
         reference_skips = []
@@ -270,14 +252,6 @@ class _CIGAR:
                     )
                     for i in range(length)
                 ]
-            if operation in (0, 7, 8):  # Alignment matches
-                alignment_matches.append(
-                    AlignmentMatch(
-                        segment=segment,
-                        reference_offset=ref_offset,
-                        size=length,
-                    )
-                )
             if operation in (0, 2, 3, 7, 8):
                 # Only these operations 'consume reference'
                 ref_offset += length
@@ -289,7 +263,6 @@ class _CIGAR:
                 raise ValueError(f"operation={operation}")
 
         return cls(
-            alignment_matches=alignment_matches,
             insertions=insertions,
             deletions=deletions,
             reference_skips=reference_skips,
@@ -304,13 +277,14 @@ class AlignedSegment:
     """
     A wrapper around pysam.AlignedSegment
     """
+
     wrapped: pysam.AlignedSegment
     reference_start: int
     reference_end: int
 
     def __init__(self, wrapped: pysam.AlignedSegment):
         """
-        :param wrapped: an instance of :external:py:class:`pysam.AlignedSegment`.
+        :param wrapped: an instance of :external:py:class:`pysam.AlignedSegment`
         """
         self.wrapped = wrapped
         "the wrapped :external:py:class:`pysam.AlignedSegment` instance."
@@ -359,28 +333,45 @@ class AlignedSegment:
 
     @functools.cached_property
     def query_sequence(self):
+        "alias of :external:py:attr:`pysam.AlignedSegment.query_sequence`"
         return self.wrapped.query_sequence
 
     def get_aligned_pairs(self, *args, **kw):
+        "alias of :external:py:meth:`pysam.AlignedSegment.get_aligned_pairs`"
         return self.wrapped.get_aligned_pairs(*args, **kw)
 
     @functools.cached_property
     def reference_sequence(self) -> str:
+        "reference sequence in the wrapped :external:py:class:`pysam.AlignedSegment`; requires the MD tag; see :external:py:meth:`pysam.AlignedSegment.get_reference_sequence`"
         return self.wrapped.get_reference_sequence()
 
     @functools.cached_property
-    def reference_position_dict(self) -> dict[int, Optional[int]]:
+    def _reference_position_dict(self) -> dict[int, int | None]:
+        "a :py:class:`dict` mapping each query position to the corresponding reference position"
         return {
             qry_pos: ref_pos
             for qry_pos, ref_pos in self.get_aligned_pairs()
             if qry_pos is not None
         }
 
-    def get_aligned_reference_position(self, query_position: int) -> Optional[int]:
-        return self.reference_position_dict[query_position]
+    def get_aligned_reference_position(self, query_position: int) -> int | None:
+        """
+        Given the `query_position`, returns the corresponding reference position , or `None` if the `query_position` is part of an insertion.
 
-    def get_aligned_query_sequence(self, reference_position: int) -> Optional[str]:
-        # Note: reference_position is 0-indexed.
+        :param query_position: 0-based query position
+        """
+        return self._reference_position_dict[query_position]
+
+    def get_aligned_query_sequence(self, reference_position: int) -> str | None:
+        """
+        Given the `reference_position`, returns the corresponding query sequence if ``self.reference_start <= reference_position < self.reference_end``, or ``None`` otherwise.
+
+        If the `reference_position` is part of a deletion or reference skip, ``"-"`` is returned.
+
+        This function is particularly useful for phasing sequencing reads into halpotype groups.
+
+        :param reference_position: 0-based reference position
+        """
         if (
             reference_position < self.reference_start
             or reference_position >= self.reference_end
@@ -396,12 +387,12 @@ class AlignedSegment:
                 break
         return "".join(self.query_sequence[i] for i in query_positions)
 
-    def get_blocks(self) -> list[tuple[int, int]]:
+    def _get_blocks(self) -> list[tuple[int, int]]:
         return self.wrapped.get_blocks()
 
-    def get_normalized_blocks(self) -> list[tuple[int, int]]:
+    def _get_normalized_blocks(self) -> list[tuple[int, int]]:
         blocks: list[tuple[int, int]] = []
-        for block_start, block_end in self.get_blocks():
+        for block_start, block_end in self._get_blocks():
             if blocks:
                 # Check previous block and merge if possible
                 previous_start, previous_end = blocks.pop(-1)
@@ -413,23 +404,23 @@ class AlignedSegment:
         return blocks
 
     @property
-    def alignment_matches(self) -> list[AlignmentMatch]:
-        return self._cigar.alignment_matches
-
-    @property
-    def insertions(self):
+    def insertions(self) -> Sequence[Insertion]:
+        "insertions identified from CIGAR"
         return self._cigar.insertions
 
     @property
-    def deletions(self):
+    def deletions(self) -> Sequence[Deletion]:
+        "deletions identified from CIGAR"
         return self._cigar.deletions
 
     @property
-    def soft_clipping(self):
+    def soft_clipping(self) -> Sequence[SoftClippedBases]:
+        "soft clipping identified from CIGAR"
         return self._cigar.soft_clippings
 
     @property
-    def hard_clipping(self):
+    def hard_clipping(self) -> Sequence[HardClippedBases]:
+        "hard clipping identified from CIGAR"
         return self._cigar.hard_clippings
 
     def _get_md_mismatched_bases(self) -> list[MdMismatchedBase]:
@@ -452,6 +443,12 @@ class AlignedSegment:
 
     @functools.cached_property
     def mismatched_bases(self) -> Sequence[_MismatchedBase]:
+        """
+        mismatched bases identified from CIGAR X (BAM_CDIFF) operation or the MD tag; empty if neither is available; see :external:attr:`pysam.AlignedSegment.cigartuples` and :external:meth:`pysam.AlignedSegment.get_aligned_pairs`
+
+        .. note::
+           For `Minimap2 <https://www.python.org/>`_, use ``--eqx`` to include mismatch information in the CIGAR string, ``--MD`` to include mismatch information in the MD tag.
+        """
         mismatched_bases: Sequence[_MismatchedBase]
         if self._cigar.mismatched_bases:
             mismatched_bases = self._cigar.mismatched_bases
@@ -463,6 +460,7 @@ class AlignedSegment:
 
     @functools.cached_property
     def modified_bases(self) -> list[ModifiedBase]:
+        "modified bases identified from the Ml and Mm tags; see :external:attr:`pysam.AlignedSegment.modified_bases`"
         modified_bases = []
         for (
             (
@@ -493,6 +491,12 @@ class AlignedSegment:
 
     @property
     def reference_skips(self) -> list[ReferenceSkip]:
+        """
+        reference skips identified from CIGAR
+        
+        .. note::
+           Reference skips often appear in RNAseq read alignment to represent introns.
+        """
         return self._cigar.reference_skips
 
 
@@ -509,10 +513,11 @@ class _LinkedSegment:
         return max(seg.reference_end for seg in self.segments)
 
 
-class SequenceAlignment(TrackPainter):
+class SequenceAlignment:
     """
     Plot sequence alignment from BAM files.
     """
+
     reference_name: str
     segments: list[AlignedSegment]
     pileup_depths: dict[int, int]
@@ -1076,7 +1081,7 @@ class SequenceAlignment(TrackPainter):
     ) -> None:
         lines: list[tuple[Point, Point]] = []
         for seg, y in zip(segments, offsets):
-            for block_start, block_end in seg.get_normalized_blocks():
+            for block_start, block_end in seg._get_normalized_blocks():
                 start_point = (block_start - 0.5, y)
                 end_point = (block_end - 0.5, y)
                 lines.append((start_point, end_point))
