@@ -75,7 +75,7 @@ def test_GNAS_WES():
     assert len(painter.segments) == 754
 
     gv = lv.GenomeViewer(2, height_ratios=(1, 8), figsize=(12, 8))
-    painter.draw_pileup(gv.axes[0], show_mismatches=False, window_size=500)
+    painter.draw_pileup(gv.axes[0], show_mismatches=False, window_size=100)
     painter.draw_alignment(
         gv.axes[1], show_mismatches=False, show_arrowheads=False, max_group_height=30
     )
@@ -85,7 +85,7 @@ def test_GNAS_WES():
     gv.savefig(OUTPUT_SVG_PATH, dpi=300)
 
     assert os.path.getsize(OUTPUT_PNG_PATH) > 10e3
-    assert 10e3 < os.path.getsize(OUTPUT_SVG_PATH) < 20e6
+    assert 10e3 < os.path.getsize(OUTPUT_SVG_PATH) < 10e6
 
 
 def test_IGH():

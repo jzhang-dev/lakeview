@@ -1635,13 +1635,13 @@ class SequenceAlignment:
                 ):  # Continue current window
                     window_depths.append(depth)
                 else:  # Calculate mean depth and start a new window
-                    window_centers.append(window_start_position + (window_size-1) / 2)
+                    window_centers.append(window_start_position + (window_size - 1) / 2)
                     mean_depth = sum(window_depths) / window_size
                     mean_depths.append(mean_depth)
                     window_depths = [depth]
                     window_start_position = position // window_size * window_size
             # Calculate mean depth for the last window
-            window_centers.append(window_start_position + (window_size-1) / 2)
+            window_centers.append(window_start_position + (window_size - 1) / 2)
             mean_depth = sum(window_depths) / window_size
             mean_depths.append(mean_depth)
 
@@ -1663,7 +1663,7 @@ class SequenceAlignment:
         x: list[float] = []
         y: list[float] = []
         for position, depth in zip(window_centers, mean_depths):
-            if not x : # First window
+            if not x:  # First window
                 x.append(position)
                 y.append(depth)
             else:
@@ -1673,7 +1673,16 @@ class SequenceAlignment:
                     y.append(0)
                 x.append(position)
                 y.append(depth)
-        print(len(x))
+
+        # Remove redundant consecutive zeros to reduce file size when saved as vector graphic
+        excluded_indices: set[int] = set(
+            i
+            for i in range(1, len(y) - 1)
+            if y[i - 1] == 0 and y[i] == 0 and y[i + 1] == 0
+        )
+        x = [xi for i, xi in enumerate(x) if i not in excluded_indices]
+        y = [yi for i, yi in enumerate(y) if i not in excluded_indices]
+
         ax.fill_between(
             x,
             y1=y,
