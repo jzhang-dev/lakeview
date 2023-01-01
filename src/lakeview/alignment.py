@@ -583,14 +583,6 @@ class SequenceAlignment:
             base_counter = collections.Counter(query_bases)
             if len(base_counter) > 1:
                 pileup_bases[position] = base_counter
-        # If a position has no coverage, there will be no columns corresponding to that position.
-        # Need to manually add zeros to the pileup_depths for correct plotting
-        # TODO: Performance: move this to draw_pileup()
-        sorted_pileup_depths: dict[int, int] = {}
-        for position in range(min(pileup_depths) - 1, max(pileup_depths) + 2):
-            sorted_pileup_depths[position] = pileup_depths.get(position, 0)
-        pileup_depths = sorted_pileup_depths
-
         return cls(
             reference_name=reference_name,
             segments=segment_list,
@@ -1665,9 +1657,23 @@ class SequenceAlignment:
         linewidth: float = 1,
         **kw,
     ):
-        x, y = self._get_mean_depths_per_window(
+        window_centers, mean_depths = self._get_mean_depths_per_window(
             self.pileup_depths, self.pileup_depths.values(), window_size=window_size
         )
+        x: list[float] = []
+        y: list[float] = []
+        for position, depth in zip(window_centers, mean_depths):
+            if not x : # First window
+                x.append(position)
+                y.append(depth)
+            else:
+                # Positions with zero coverage need to be inserted explicitly for correct plotting
+                while x[-1] < position - window_size:
+                    x.append(x[-1] + window_size)
+                    y.append(0)
+                x.append(position)
+                y.append(depth)
+        print(len(x))
         ax.fill_between(
             x,
             y1=y,

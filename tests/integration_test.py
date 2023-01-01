@@ -67,20 +67,25 @@ def test_SKBR3():
 def test_GNAS_WES():
     CHROMOSOME = "20"
     EXON_BAM_PATH = "tests/data/HG002_GNAS_Illumina_WES.bam"
+    OUTPUT_PNG_PATH = "tests/output/GNAS_WES.png"
     OUTPUT_SVG_PATH = "tests/output/GNAS_WES.svg"
+
     painter = lv.SequenceAlignment.from_file(EXON_BAM_PATH, CHROMOSOME)
     painter.segments = [seg for i, seg in enumerate(painter.segments) if i % 20 == 0]
     assert len(painter.segments) == 754
 
     gv = lv.GenomeViewer(2, height_ratios=(1, 8), figsize=(12, 8))
-    painter.draw_pileup(gv.axes[0], show_mismatches=False)
+    painter.draw_pileup(gv.axes[0], show_mismatches=False, window_size=500)
     painter.draw_alignment(
         gv.axes[1], show_mismatches=False, show_arrowheads=False, max_group_height=30
     )
     gv.set_xlabel("chr20")
     gv.set_title("HG002 GNAS Illumina WES")
-    gv.savefig(OUTPUT_SVG_PATH)
-    assert os.path.getsize(OUTPUT_SVG_PATH) > 1e6
+    gv.savefig(OUTPUT_PNG_PATH, dpi=300)
+    gv.savefig(OUTPUT_SVG_PATH, dpi=300)
+
+    assert os.path.getsize(OUTPUT_PNG_PATH) > 10e3
+    assert 10e3 < os.path.getsize(OUTPUT_SVG_PATH) < 20e6
 
 
 def test_IGH():
