@@ -17,6 +17,7 @@ release = "0.1"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.autosectionlabel",
     "myst_nb",
     "IPython.sphinxext.ipython_console_highlighting",
 ]
@@ -37,7 +38,6 @@ html_theme_options = {
     "repository_url": "https://github.com/jzhang-dev/lakeview",
     "use_repository_button": True,
     "use_fullscreen_button": False,
-
 }
 # html_static_path = ['_static']
 
@@ -51,11 +51,16 @@ autodoc_default_options = {
     "member-order": "bysource",
     "show-inheritance": True,
 }
-#autodoc_type_aliases = {'GroupIdentifier': "lakeview._type_alias.GroupIdentifier"}
+# autodoc_type_aliases = {'GroupIdentifier': "lakeview._type_alias.GroupIdentifier"}
 
 # -- Options for Intersphinx -------------------------------------------------
-intersphinx_mapping = {"python": ("https://docs.python.org/3", None), "pysam": ("https://pysam.readthedocs.io/en/latest", None)}
-
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "pysam": ("https://pysam.readthedocs.io/en/latest", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None)
+}
 
 
 # -- Options for mysb-nb -------------------------------------------------

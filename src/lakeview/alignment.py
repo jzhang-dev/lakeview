@@ -519,9 +519,18 @@ class SequenceAlignment:
     """
 
     reference_name: str
+    """Name of the reference sequence."""
     segments: list[AlignedSegment]
+    """
+    A list of aligned segments loaded, in the order that appears in the source file.
+    
+    .. note::
+       For advanced users, it is possible to modify this attribute prior to plotting to apply complex filtering/sorting operations.
+    """
     pileup_depths: dict[int, int]
+    """A dict mapping reference positions to pileup depths."""
     pileup_bases: dict[int, collections.Counter[str]]
+    """A dict mapping reference positions to a counter, which in turn maps each base to its count."""
 
     def __init__(
         self,
@@ -598,9 +607,17 @@ class SequenceAlignment:
         **kw,
     ):
         """
-        region: reference_name compulsory even if only one reference sequence exists for explicity
-        start and end coordinates are optional
-        samtools-compatible region string, or a two-element tuple containing reference name and a coordinate interval (start, end). If the coordinate interval is `None`, it will be assumed to be from the first base to the last base of the reference sequence
+        Load sequence alignment from a local BAM file.
+
+        .. note::
+           Python file objects are not supported due to `a known limitation of pysam <https://pysam.readthedocs.io/en/latest/usage.html#using-streams>`_.
+
+        .. note::
+           The SAM format is not supported as it does not allow random access.
+
+        :param file_path: Path to the BAM file.
+        :param region: Region to load alignment records from. See :ref:`Specifying regions of interest`.
+        :param kw: Keyword arguments passed to :external:class:`pysam.AlignmentFile`.
         """
         with pysam.AlignmentFile(
             file_path, mode="rb", require_index=True, **kw
@@ -616,6 +633,17 @@ class SequenceAlignment:
         index_url: str | None = None,
         **kw,
     ):
+        """
+        Load sequence alignment from a remote BAM file via HTTP/HTTPS/FTP protocol.
+
+        .. note::
+           The SAM format is not supported as it does not allow random access.
+
+        :param url: URL to the remote BAM file.
+        :param region: Region to load alignment records from. See :ref:`Specifying regions of interest`.
+        :param index_url: URL to the remote BAM index (.bai) file. The default is ``url + '.bai'``.
+        :param kw: Keyword arguments passed to :external:class:`pysam.AlignmentFile`.
+        """
         workdir = os.getcwd()
         with tempfile.TemporaryDirectory() as d:
             try:
@@ -838,41 +866,31 @@ class SequenceAlignment:
 
     def draw_alignment(
         self,
-        ax,
+        ax: Axes,
         *,
-        sort_by: Union[
-            Callable[[AlignedSegment], Identifier],
-            Iterable[Identifier],
-            Literal["length", "start"],
-            None,
-        ] = None,
-        link_by: Union[
-            Callable[[AlignedSegment], LinkIdentifier],
-            Iterable[LinkIdentifier],
-            Literal["name", "pair"],  # TODO: link by pair
-            None,
-        ] = None,
-        group_by: Union[
-            Callable[[AlignedSegment], GroupIdentifier],
-            Iterable[GroupIdentifier],
-            Literal["haplotype", "proper_pair", "strand"],
-            None,
-        ] = None,
-        filter_by: Union[
-            Callable[[AlignedSegment], bool],
-            Iterable[bool],
-            str,
-            None,
-        ] = None,
-        color_by: Union[
-            Callable[[AlignedSegment], Color],
-            Iterable[Color],
-            Literal["proper_pair", "strand"],
-            None,
-        ] = None,
-        group_labels: Union[
-            Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
-        ] = None,
+        filter_by: Callable[[AlignedSegment], bool]
+        | Iterable[bool]
+        | str
+        | None = None,
+        sort_by: Callable[[AlignedSegment], Identifier]
+        | Iterable[Identifier]
+        | Literal["length", "start"]
+        | None = None,
+        link_by: Callable[[AlignedSegment], LinkIdentifier]
+        | Iterable[LinkIdentifier]
+        | Literal["name", "pair"]
+        | None = None,  # TODO: link by pair
+        group_by: Callable[[AlignedSegment], GroupIdentifier]
+        | Iterable[GroupIdentifier]
+        | Literal["haplotype", "proper_pair", "strand"]
+        | None = None,
+        color_by: Callable[[AlignedSegment], Color]
+        | Iterable[Color]
+        | Literal["proper_pair", "strand"]
+        | None = None,
+        group_labels: Callable[[GroupIdentifier], str]
+        | Mapping[GroupIdentifier, str]
+        | None = None,
         height: Optional[float] = None,
         min_spacing: Optional[float] = None,
         show_backbones: bool = True,
@@ -909,6 +927,25 @@ class SequenceAlignment:
         overheight_markers_kw={},
     ):
         """
+        Draw sequence alignment patterns, in a style similar to `IGH alignment track <https://software.broadinstitute.org/software/igv/alignmentdata#alignmenttrack>`_.
+
+        Segments are drawn from top to bottom on the given `ax`.
+
+        :param ax: Matplotlib :external:class:`matplotlib.axes.Axes` instance to plot on.
+        :param filter_by: Specify which aligned segments plotted. The default is to plot all aligned segments.
+        :param sort_by: Specify how aligned segments are sorted before plotting. The default is to keep the order of segments in the source file.
+        :param link_by: Specify which segments are linked together before plotting. When two or more segments are linked, they will be plotted in the same row, even if they overlap with each other. The default is to link no segments together.
+        :param group_by: Specify which segments are groupped together before plotting. Groupped segments are plotted next to each other. The default is not to link any segments. The default is to group no segments together.
+        :param color_by: Specify segments colors. The default is to color all segments in light gray.
+        :param group_labels: Text labels for each group. The default is to use group identifiers as labels. This parameter is only valid when a custom value for `group_by` is used.
+        :param height: Segment height in points. The default is to infer automatically.
+        :param min_spacing: The minimum horizontal spacing between two adjacent segments in the same row, in terms of number of bases. The default is to infer automatically.
+
+
+
+        .. note::
+           For a detailed explaination on how to use `filter_by`, `sort_by`, `link_by`, `group_by`, and `color_by`, see :ref:`Custom layout`.
+
         Groups are ordered by group id.
         Linked reads are ordered by first read in the link.
         """
@@ -1590,6 +1627,17 @@ class SequenceAlignment:
         pileup_kw={},
         mismatch_kw={},
     ):
+        """
+        Draw pileup depths for alignment, in a style similar to `IGV coverage track <https://software.broadinstitute.org/software/igv/alignmentdata#coverage>`_.
+
+        :param ax: Matplotlib :external:class:`matplotlib.axes.Axes` instance to plot on.
+        :param show_mismatches: If ``True``, mismatched bases will be shown as colored bars.
+        :param min_alt_frequency: Mismatched bases with frequency less than `min_alt_frequency` will not be shown.
+        :param min_alt_depth: Mismatched bases with depth less than `min_alt_frequency` will not be shown.
+        :param window_size: Show mean depth values in non-overlapping windows. Windows start from integer multiples of `window_size`.
+        :param pileup_kw: Keyword arguments passed to :external:meth:`matplotlib.axes.Axes.fill_between`.
+        :param mismatch_kw: Keyword arguments passed to :external:meth:`matplotlib.axes.Axes.bar`.
+        """
         self._draw_pileup_fill(ax, window_size=window_size, **pileup_kw)
         if show_mismatches:
             self._draw_pileup_mismatches(
@@ -1676,9 +1724,7 @@ class SequenceAlignment:
 
         # Remove redundant values to reduce file size when saved as vector graphic
         excluded_indices: set[int] = set(
-            i
-            for i in range(1, len(y) - 1)
-            if y[i - 1] == y[i] ==  y[i + 1]
+            i for i in range(1, len(y) - 1) if y[i - 1] == y[i] == y[i + 1]
         )
         x = [xi for i, xi in enumerate(x) if i not in excluded_indices]
         y = [yi for i, yi in enumerate(y) if i not in excluded_indices]
@@ -1708,6 +1754,7 @@ class SequenceAlignment:
             "C": "tab:blue",
             "G": "tab:brown",
         },
+        **kw,
     ):
         mismatch_positions = set()
         if self.pileup_bases is None or self.pileup_depths is None:
@@ -1747,6 +1794,7 @@ class SequenceAlignment:
                 facecolor=color,
                 edgecolor=color,
                 bottom=bs,
+                **kw,
             )
             bottom += counts
 
