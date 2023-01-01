@@ -493,7 +493,7 @@ class AlignedSegment:
     def reference_skips(self) -> list[ReferenceSkip]:
         """
         reference skips identified from CIGAR
-        
+
         .. note::
            Reference skips often appear in RNAseq read alignment to represent introns.
         """
@@ -1591,19 +1591,16 @@ class SequenceAlignment:
         self,
         ax: Axes,
         *,
-        color: Color = "lightgray",
         show_mismatches: bool = True,
         min_alt_frequency: float = 0.2,
         min_alt_depth: float = 2,
+        facecolor: Color = "lightgray",
+        edgecolor: Color = "none",
+        linewidth: float = 1,
+        pileup_kw={},
         mismatch_kw={},
-        **kw,
     ):
-        if self.pileup_depths is None:
-            raise ValueError("Pileup has not been loaded.")
-        x = list(self.pileup_depths)
-        y = list(self.pileup_depths.values())
-        ax.fill_between(x, y1=y, y2=0, step="mid", facecolor=color, edgecolor="none")
-        ax.set_ylim(bottom=0)
+        self._draw_pileup_fill(ax, **pileup_kw)
         if show_mismatches:
             self._draw_pileup_mismatches(
                 ax,
@@ -1611,6 +1608,29 @@ class SequenceAlignment:
                 min_alt_depth=min_alt_depth,
                 **mismatch_kw,
             )
+
+    def _draw_pileup_fill(
+        self,
+        ax: Axes,
+        *,
+        facecolor: Color = "lightgray",
+        edgecolor: Color = "none",
+        linewidth: float = 1,
+        **kw,
+    ):
+        x = list(self.pileup_depths)
+        y = list(self.pileup_depths.values())
+        ax.fill_between(
+            x,
+            y1=y,
+            y2=0,
+            step="mid",
+            facecolor=facecolor,
+            edgecolor=edgecolor,
+            linewidth=linewidth,
+            **kw,
+        )
+        ax.set_ylim(bottom=0)
 
     def _draw_pileup_mismatches(
         self,
