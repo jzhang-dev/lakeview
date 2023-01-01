@@ -1594,13 +1594,11 @@ class SequenceAlignment:
         show_mismatches: bool = True,
         min_alt_frequency: float = 0.2,
         min_alt_depth: float = 2,
-        facecolor: Color = "lightgray",
-        edgecolor: Color = "none",
-        linewidth: float = 1,
+        window_size: int = 1,
         pileup_kw={},
         mismatch_kw={},
     ):
-        self._draw_pileup_fill(ax, **pileup_kw)
+        self._draw_pileup_fill(ax, window_size=window_size, **pileup_kw)
         if show_mismatches:
             self._draw_pileup_mismatches(
                 ax,
@@ -1609,17 +1607,67 @@ class SequenceAlignment:
                 **mismatch_kw,
             )
 
+    @staticmethod
+    def _get_mean_depths_per_window(
+        positions: Iterable[int], depths: Iterable[int], window_size: int = 1
+    ) -> tuple[Sequence[float], Sequence[float]]:
+        """
+        Get per-window mean values of `depths` across given `positions`.
+        Windows start from integer multiples of `window_size`.
+
+        >>> depths    = [3, 4, 5, 0, 3, 0 ]
+        >>> positions = [0, 1, 2, 8, 9, 10]
+        >>> _windows  = "-------  -  -----"
+        >>> SequenceAlignment._get_mean_depths_per_window(positions, depths, window_size=3)
+        ([1.0, 7.0, 10.0], [4.0, 0.0, 1.0])
+        """
+
+        window_centers: list[float] = []
+        mean_depths: list[float] = []
+
+        if window_size <= 0:
+            raise ValueError(
+                f"Invalid value for `window_size`: {window_size:r}. Expecting a positive integer."
+            )
+        elif window_size == 1:
+            window_centers = list(positions)
+            mean_depths = list(depths)
+        else:
+            window_centers = []
+            mean_depths = []
+            window_start_position: int = 0
+            window_depths: list[int] = []
+            for position, depth in zip(positions, depths):
+                if (
+                    position - window_start_position < window_size
+                ):  # Continue current window
+                    window_depths.append(depth)
+                else:  # Calculate mean depth and start a new window
+                    window_centers.append(window_start_position + (window_size-1) / 2)
+                    mean_depth = sum(window_depths) / window_size
+                    mean_depths.append(mean_depth)
+                    window_depths = [depth]
+                    window_start_position = position // window_size * window_size
+            # Calculate mean depth for the last window
+            window_centers.append(window_start_position + (window_size-1) / 2)
+            mean_depth = sum(window_depths) / window_size
+            mean_depths.append(mean_depth)
+
+        return window_centers, mean_depths
+
     def _draw_pileup_fill(
         self,
         ax: Axes,
         *,
+        window_size: int = 1,
         facecolor: Color = "lightgray",
         edgecolor: Color = "none",
         linewidth: float = 1,
         **kw,
     ):
-        x = list(self.pileup_depths)
-        y = list(self.pileup_depths.values())
+        x, y = self._get_mean_depths_per_window(
+            self.pileup_depths, self.pileup_depths.values(), window_size=window_size
+        )
         ax.fill_between(
             x,
             y1=y,
