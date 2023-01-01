@@ -1674,11 +1674,11 @@ class SequenceAlignment:
                 x.append(position)
                 y.append(depth)
 
-        # Remove redundant consecutive zeros to reduce file size when saved as vector graphic
+        # Remove redundant values to reduce file size when saved as vector graphic
         excluded_indices: set[int] = set(
             i
             for i in range(1, len(y) - 1)
-            if y[i - 1] == 0 and y[i] == 0 and y[i + 1] == 0
+            if y[i - 1] == y[i] ==  y[i + 1]
         )
         x = [xi for i, xi in enumerate(x) if i not in excluded_indices]
         y = [yi for i, yi in enumerate(y) if i not in excluded_indices]
