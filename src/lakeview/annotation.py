@@ -13,7 +13,7 @@ from ._region_notation import (
     normalize_region_notation,
     get_region_notation,
 )
-from .helpers import filter_by_keys, sort_by_keys, pack_intervals
+from .helpers import key_filter, key_sort, pack_intervals
 from .plot import get_ax_size
 from ._type_alias import GroupIdentifier, Color, Axes, Identifier
 
@@ -67,10 +67,10 @@ class CdsRecord(AnnotationRecord):
 
 @dataclass(repr=False)
 class GeneAnnotation:
-    genes: list[AnnotationRecord]
-    transcripts: list[TranscriptRecord]
-    exons: list[ExonRecord]
-    cdss: list[CdsRecord]
+    genes: Sequence[AnnotationRecord]
+    transcripts: Sequence[TranscriptRecord]
+    exons: Sequence[ExonRecord]
+    cdss: Sequence[CdsRecord]
 
     @staticmethod
     def parse_attribute_string(
@@ -106,7 +106,7 @@ class GeneAnnotation:
         *,
         format_: Literal["gtf", "gff", "gff3"],
         features: Container[str],
-    ) -> list[AnnotationRecord]:
+    ) -> Sequence[AnnotationRecord]:
         # Parse region
         sequence_name: str
         interval: tuple[int, int] | None
@@ -406,7 +406,7 @@ class GeneAnnotation:
         return np.array(pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
-    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> list[int]:
+    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> Sequence[int]:
         offsets = np.zeros(len(transcripts))
         y = 0
         for group in list(sorted(set(groups))):
@@ -426,11 +426,11 @@ class GeneAnnotation:
         filter_by,
         color_by,
         label_by,
-    ) -> tuple[list[TranscriptRecord], list[GroupIdentifier], list[Color], list[str]]:
-        transcripts = self.transcripts
+    ) -> tuple[Sequence[TranscriptRecord], Sequence[GroupIdentifier], Sequence[Color], Sequence[str]]:
+        transcripts: Sequence[TranscriptRecord] = self.transcripts
         n_transcripts = len(transcripts)
         # Groups
-        groups: list[GroupIdentifier] = []
+        groups: Sequence[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_transcripts
         elif callable(group_by):
@@ -439,7 +439,7 @@ class GeneAnnotation:
             groups = list(group_by)
 
         # Colors
-        colors: list[Color] = []
+        colors: Sequence[Color] = []
         if color_by is None:
             colors = ["b"] * n_transcripts
         elif callable(color_by):
@@ -448,7 +448,7 @@ class GeneAnnotation:
             colors = list(color_by)
 
         # Labels
-        labels: list[str] = []
+        labels: Sequence[str] = []
         if label_by is None:
             labels = [""] * n_transcripts
         if isinstance(label_by, str):
@@ -464,41 +464,47 @@ class GeneAnnotation:
             labels = list(label_by)
 
         # Filter transcripts
-        selection: list[bool] = []
+        filter_keys: Sequence[bool] = []
         if isinstance(filter_by, str):
             pass
         if isinstance(filter_by, Iterable):
-            selection = list(filter_by)
-            if len(selection) != n_transcripts:
+            filter_keys = list(filter_by)
+            if len(filter_keys) != n_transcripts:
                 raise ValueError()
         elif callable(filter_by):
-            selection = [filter_by(t) for t in transcripts]
+            filter_keys = [filter_by(t) for t in transcripts]
         elif isinstance(filter_by, Iterable):
-            selection = list(filter_by)
-        if filter_by is not None:
-            transcripts, groups, labels = filter_by_keys(
-                transcripts, groups, labels, keys=selection
-            )
-            if not transcripts:
-                warnings.warn("All segments removed after filtering.")
+            filter_keys = list(filter_by)
 
         # Sort transcripts
-        keys: list[Identifier] = []
+        sort_keys: Sequence[Identifier] = []
         if sort_by is None:
             pass
         if isinstance(sort_by, str):
             if sort_by == "length":
-                keys = [-len(t) for t in transcripts]
+                sort_keys = [-len(t) for t in transcripts]
             else:
                 raise TypeError()
         elif callable(sort_by):
-            keys = [sort_by(t) for t in transcripts]
+            sort_keys = [sort_by(t) for t in transcripts]
         elif isinstance(sort_by, Iterable):
-            keys = list(sort_by)
+            sort_keys = list(sort_by)
+        
+
+
+        if filter_by is not None:
+            transcripts = key_filter(transcripts, filter_keys)
+            groups = key_filter(groups, filter_keys)
+            labels = key_filter(labels, filter_keys)
+            if sort_by is not None:
+                sort_keys = key_filter(sort_keys, filter_keys)
+            if len(transcripts) == 0:
+                warnings.warn("All segments removed after filtering.")
+
         if sort_by is not None:
-            transcripts, groups, labels = sort_by_keys(
-                transcripts, groups, labels, keys=keys
-            )
+            transcripts = key_sort(transcripts, sort_keys)
+            groups = key_sort(groups, sort_keys)
+            labels = key_sort(labels, sort_keys)
 
         return transcripts, groups, colors, labels
 
@@ -538,12 +544,17 @@ class GeneAnnotation:
             Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
         ] = None,
         height: Optional[float] = None,
-        max_group_height=100,
+        max_rows: int=100,
         transcripts_kw={},
         exons_kw={},
         cdss_kw={},
         labels_kw={},
-    ):
+    ):  
+        """
+        Draw sequence alignment patterns, in a style similar to `IGH feature track <https://software.broadinstitute.org/software/igv/feature_track_options>`_.
+
+        :param max_rows: The maximum number of rows to layout transcripts. Excess transcripts will not be drawn. If multiple transcript groups exist, this parameter limits the maximum number of rows *per group*. 
+        """
         transcripts, groups, colors, labels = self._parse_transcript_parameters(
             sort_by=sort_by,
             group_by=group_by,
@@ -552,14 +563,21 @@ class GeneAnnotation:
             label_by=label_by,
         )
 
+        max_group_offset = max_rows - 1
         offsets = self._get_transcript_offsets(
-            transcripts, groups, max_group_offset=max_group_height - 1
+            transcripts, groups, max_group_offset=max_group_offset
         )
 
-        transcripts, colors, groups, labels, offsets = filter_by_keys(
-            transcripts, colors, groups, labels, offsets, keys=[y >= 0 for y in offsets]
-        )
+        # Remove transcripts exceeding `max_rows`
+        if not all(y >= 0 for y in offsets):
+            filter_keys = [y >= 0 for y in offsets]
+            transcripts = key_filter(transcripts, filter_keys)
+            colors = key_filter(colors, filter_keys)
+            groups = key_filter(groups, filter_keys)
+            offsets = key_filter(offsets, filter_keys)
+            labels = key_filter(labels, filter_keys)
 
+        # Get transcript height
         if height is None:
             _, ax_height = get_ax_size(ax)
             height = max(

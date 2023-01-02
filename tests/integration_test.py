@@ -26,7 +26,7 @@ def test_SKBR3():
         gv.axes[1],
         color_by="proper_pair",
         group_by="strand",
-        max_group_height=30,
+        max_rows=30,
     )
     pacbio_painter.draw_pileup(gv.axes[2])
     pacbio_painter.draw_alignment(gv.axes[3])
@@ -57,7 +57,7 @@ def test_SKBR3():
         group_by=lambda seg: snp_tag(seg, 64_043_248),
         show_mismatches=True,
         mismatches_kw=dict(linewidth=3),
-        max_group_height=20,
+        max_rows=20,
     )
     gv.set_xlim(64042997, 64043297)
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
@@ -77,7 +77,7 @@ def test_GNAS_WES():
     gv = lv.GenomeViewer(2, height_ratios=(1, 8), figsize=(12, 8))
     painter.draw_pileup(gv.axes[0], show_mismatches=False, window_size=100)
     painter.draw_alignment(
-        gv.axes[1], show_mismatches=False, show_arrowheads=False, max_group_height=30
+        gv.axes[1], show_mismatches=False, show_arrowheads=False, max_rows=30
     )
     gv.set_xlabel("chr20")
     gv.set_title("HG002 GNAS Illumina WES")
@@ -116,9 +116,9 @@ def test_IGH():
         show_mismatches=False,
         sort_by="length",
         link_by="name",
-        max_group_height=50,
+        max_rows=50,
     )
-    gencode_painter.draw_transcripts(gv.axes[2], max_group_height=4, sort_by="length")
+    gencode_painter.draw_transcripts(gv.axes[2], max_rows=5, sort_by="length")
 
     gv.set_xlim((105679000, 105776000))
     gv.set_xlabel(CHROMOSOME)
@@ -148,7 +148,7 @@ def test_GAPDH_RNAseq():
         show_soft_clippings=False,
         show_hard_clippings=False,
         show_mismatches=True,
-        max_group_height=50,
+        max_rows=50,
         show_group_labels=False,
         show_group_separators=False,
     )

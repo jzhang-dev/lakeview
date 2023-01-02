@@ -916,6 +916,7 @@ class SequenceAlignment:
         | Mapping[GroupIdentifier, str]
         | None = None,
         height: Optional[float] = None,
+        max_rows: int = 200,
         min_spacing: Optional[float] = None,
         show_backbones: bool = True,
         show_arrowheads: bool = True,
@@ -933,7 +934,6 @@ class SequenceAlignment:
         show_reference_skips: bool = True,
         show_group_labels: Optional[bool] = None,
         show_group_separators: bool = True,
-        max_group_height: float = 1000,
         backbones_kw={},
         arrowheads_kw={},
         links_kw={},
@@ -962,7 +962,7 @@ class SequenceAlignment:
         :param group_labels: Text labels for each group. The default is to use group identifiers as labels. This parameter is only valid when a custom value for `group_by` is used.
         :param height: Segment height in points. The default is to infer automatically.
         :param min_spacing: The minimum horizontal spacing between two adjacent segments in the same row, in terms of number of bases. The default is to infer automatically.
-
+        :param max_rows: The maximum number of rows to layout segments. Excess segments will not be drawn. If multiple segment groups exist, this parameter limits the maximum number of rows *per group*. 
         .. note::
            For a detailed explaination on how to use `filter_by`, `sort_by`, `link_by`, `group_by`, and `color_by`, see :ref:`Custom layout`.
 
@@ -985,15 +985,16 @@ class SequenceAlignment:
             min_spacing = self._get_default_spacing(segments)
 
         # Get segment offsets
+        max_group_offset = max_rows - 1
         offsets = self._get_segment_offsets(
             segments,
             links,
             groups,
-            max_group_offset=max_group_height,
+            max_group_offset=max_group_offset,
             min_spacing=min_spacing,
         )
 
-        # Remove segments exceeding `max_group_offset`
+        # Remove segments exceeding `max_rows`
         if not all(y >= 0 for y in offsets):
             filter_keys = [y >= 0 for y in offsets]
             segments = key_filter(segments, filter_keys)

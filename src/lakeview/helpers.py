@@ -46,65 +46,7 @@ def key_filter(sequence: Sequence[T], keys: Sequence[bool]) -> Sequence[T]:
     if len(sequence) != len(keys):
         raise ValueError(f"`sequence` and `keys` have different lengths: {len(sequence)=}; {len(keys)=}.")
     return [element for element, key in zip(sequence, keys) if key]
-
-
-def sort_by_keys(
-    *iterables: Sequence, keys: Sequence[Identifier], reverse: bool = False
-) -> list[list]:
-    """
-    Sort multiple equal-length sequences by the value of another sequences.
-
-    >>> a = ['a', 'b', 'c']
-    >>> b = ['x', 'y', 'z']
-    >>> r = [3, 1, 2]
-    >>> sort_by_keys(a, b, keys=r, reverse=False)
-    [('b', 'c', 'a'), ('y', 'z', 'x')]
-    """
-    # Check iterable lengths are equal
-    lengths = [len(x) for x in iterables] + [len(keys)]
-    if len(set(lengths)) > 1:
-        raise ValueError("All iterables and `keys` must have the same length.")
-    # Return early if iterables are empty
-    if any(l == 0 for l in lengths):
-        return [[] for x in iterables]
-
-    zipped_lists = list(zip(*iterables))
-    sorted_zipped_lists = [
-        x
-        for (_, x) in sorted(
-            zip(keys, zipped_lists), key=lambda pair: pair[0], reverse=reverse
-        )
-    ]
-    sorted_lists = list(zip(*sorted_zipped_lists))
-    return sorted_lists
-
-
-def filter_by_keys(*iterables: Sequence, keys: Sequence[bool]) -> list[list]:
-    """
-    Filter multiple equal-length lists by the value of another list.
-
-    >>> a = ['a', 'b', 'c']
-    >>> b = ['x', 'y', 'z']
-    >>> f = [True, False, True]
-    >>> filter_by_keys(a, b, keys=f)
-    [('a', 'c'), ('x', 'z')]
-    """
-    # Check iterable lengths are equal
-    lengths = [len(x) for x in iterables] + [len(keys)]
-    if len(set(lengths)) > 1:
-        raise ValueError("All iterables and `keys` must have the same length.")
-    # Return early if iterables are empty
-    if any(l == 0 for l in lengths):
-        return [[] for x in iterables]
-
-    zipped_lists = list(zip(*iterables))
-    filtered_zipped_lists = [x for (x, b) in zip(zipped_lists, keys) if b]
-    filtered_lists = list(zip(*filtered_zipped_lists))
-    return filtered_lists
-
-
-
-
+    
 
 def pack_intervals(intervals: Iterable[tuple[float, float]]) -> list[int]:
     """
