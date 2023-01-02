@@ -748,20 +748,21 @@ class SequenceAlignment:
         colors: list[Color] = []
         if color_by is None:
             colors = ["lightgray"] * n_segments
-        elif color_by == "proper_pair":
-            colors = [
-                "lightgray" if segment.is_proper_pair else "firebrick"
-                for segment in segments
-            ]
-        elif color_by == "strand":
-            colors = list(
-                map(
-                    lambda segment: "lightgray" if segment.is_forward else "darkgray",
-                    segments,
+        if isinstance(color_by, str):
+            if color_by == "proper_pair":
+                colors = [
+                    "lightgray" if segment.is_proper_pair else "firebrick"
+                    for segment in segments
+                ]
+            elif color_by == "strand":
+                colors = list(
+                    map(
+                        lambda segment: "lightgray" if segment.is_forward else "darkgray",
+                        segments,
+                    )
                 )
-            )
-        elif isinstance(color_by, str):
-            raise ValueError()
+            else:
+                raise ValueError()
         elif isinstance(color_by, Iterable):
             colors = list(color_by)
             if len(colors) != n_segments:
@@ -773,17 +774,18 @@ class SequenceAlignment:
         groups: list[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_segments  # Assign all segments into the same group
-        elif group_by == "haplotype":
-            groups = [
-                seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
-                for seg in segments
-            ]
-        elif group_by == "proper_pair":
-            groups = [seg.is_proper_pair for seg in segments]
-        elif group_by == "strand":
-            groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
-        elif isinstance(group_by, str):
-            raise ValueError()
+        if isinstance(group_by, str):
+            if group_by == "haplotype":
+                groups = [
+                    seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
+                    for seg in segments
+                ]
+            elif group_by == "proper_pair":
+                groups = [seg.is_proper_pair for seg in segments]
+            elif group_by == "strand":
+                groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
+            else:
+                raise ValueError()
         elif isinstance(group_by, Iterable):
             groups = list(group_by)
             if len(groups) != n_segments:
@@ -795,12 +797,13 @@ class SequenceAlignment:
         links: list[LinkIdentifier] = []
         if link_by is None:
             links = list(range(n_segments))  # Do not link segments together
-        elif link_by == "pair":
-            links = list(range(n_segments))  # TODO
-        elif link_by == "name":
-            links = [seg.query_name for seg in segments]
         elif isinstance(link_by, str):
-            raise ValueError()
+            if link_by == "pair":
+                links = list(range(n_segments))  # TODO
+            elif link_by == "name":
+                links = [seg.query_name for seg in segments]
+            else:
+                raise ValueError()
         elif isinstance(link_by, Iterable):
             links = list(link_by)
             if len(links) != n_segments:
@@ -808,42 +811,55 @@ class SequenceAlignment:
         elif callable(link_by):
             links = [link_by(seg) for seg in segments]
 
-        # Filter segments
-        selection: list[bool] = []
-        if filter_by == "no_secondary":
-            selection = [not seg.is_secondary for seg in segments]
+        # Keys for filtering 
+        filter_keys: list[bool] = []
+        if filter_by is None:
+            pass
         elif isinstance(filter_by, str):
-            raise ValueError()
+            if filter_by == "no_secondary":
+                filter_keys = [not seg.is_secondary for seg in segments]
+            else:
+                raise ValueError()
         elif isinstance(filter_by, Iterable):
-            selection = list(filter_by)  # type: ignore
-            if len(selection) != n_segments:
+            filter_keys = list(filter_by)  # type: ignore
+            if len(filter_keys) != n_segments:
                 raise ValueError()
         elif callable(filter_by):
-            selection = [filter_by(seg) for seg in segments]
+            filter_keys = [filter_by(seg) for seg in segments]
+        else:
+            raise TypeError(f"Invalid type for `filter_by`: f{type(filter_by)!r}.")
+        
+        # Keys for sorting 
+        sort_keys: list[Identifier] = []
+        if sort_by is None:
+            sort_keys = [0] * n_segments
+        elif isinstance(sort_by, str):
+            if sort_by == "start":
+                sort_keys = [seg.reference_start for seg in segments]
+            elif sort_by == "length":
+                sort_keys = [-seg.query_alignment_length for seg in segments]
+            else:
+                raise ValueError()
+        elif isinstance(sort_by, Iterable):
+            sort_keys = list(sort_by)
+            if len(sort_keys) != n_segments:
+                raise ValueError()
+        elif callable(sort_by):
+            sort_keys = [sort_by(seg) for seg in segments]
+        else:
+            raise TypeError(f"Invalid type for `sort_by`: f{type(sort_by)!r}.")
+
+        # Filter segments
         if filter_by is not None:
-            segments, colors, links, groups = filter_by_keys(
-                segments, colors, links, groups, keys=selection
+            segments, colors, links, groups, sort_keys = filter_by_keys(
+                segments, colors, links, groups, sort_keys, keys=filter_keys
             )
             if not segments:
                 warnings.warn("All segments removed after filtering.")
-
         # Sort segments
-        keys: list[Identifier] = []
-        if sort_by == "start":
-            keys = [seg.reference_start for seg in segments]
-        elif sort_by == "length":
-            keys = [-seg.query_alignment_length for seg in segments]
-        elif isinstance(sort_by, str):
-            raise ValueError()
-        elif isinstance(sort_by, Iterable):
-            keys = list(sort_by)
-            if len(keys) != n_segments:
-                raise ValueError()
-        elif callable(sort_by):
-            keys = [sort_by(seg) for seg in segments]
         if sort_by is not None:
             segments, colors, links, groups = sort_by_keys(
-                segments, colors, links, groups, keys=keys
+                segments, colors, links, groups, keys=sort_keys
             )
 
         return segments, links, groups, colors
@@ -940,8 +956,6 @@ class SequenceAlignment:
         :param group_labels: Text labels for each group. The default is to use group identifiers as labels. This parameter is only valid when a custom value for `group_by` is used.
         :param height: Segment height in points. The default is to infer automatically.
         :param min_spacing: The minimum horizontal spacing between two adjacent segments in the same row, in terms of number of bases. The default is to infer automatically.
-
-
 
         .. note::
            For a detailed explaination on how to use `filter_by`, `sort_by`, `link_by`, `group_by`, and `color_by`, see :ref:`Custom layout`.

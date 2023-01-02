@@ -451,12 +451,13 @@ class GeneAnnotation:
         labels: list[str] = []
         if label_by is None:
             labels = [""] * n_transcripts
-        elif label_by == "gene_name":
-            labels = [
-                t.gene_name if t.gene_name is not None else "" for t in transcripts
-            ]
-        elif isinstance(label_by, str):
-            raise TypeError()
+        if isinstance(label_by, str):
+            if label_by == "gene_name":
+                labels = [
+                    t.gene_name if t.gene_name is not None else "" for t in transcripts
+                ]
+            else:
+                raise TypeError()
         elif callable(label_by):
             labels = [label_by(t) for t in transcripts]
         elif isinstance(label_by, Iterable):
@@ -464,6 +465,8 @@ class GeneAnnotation:
 
         # Filter transcripts
         selection: list[bool] = []
+        if isinstance(filter_by, str):
+            pass
         if isinstance(filter_by, Iterable):
             selection = list(filter_by)
             if len(selection) != n_transcripts:
@@ -483,10 +486,11 @@ class GeneAnnotation:
         keys: list[Identifier] = []
         if sort_by is None:
             pass
-        elif sort_by == "length":
-            keys = [-len(t) for t in transcripts]
-        elif isinstance(sort_by, str):
-            raise TypeError()
+        if isinstance(sort_by, str):
+            if sort_by == "length":
+                keys = [-len(t) for t in transcripts]
+            else:
+                raise TypeError()
         elif callable(sort_by):
             keys = [sort_by(t) for t in transcripts]
         elif isinstance(sort_by, Iterable):

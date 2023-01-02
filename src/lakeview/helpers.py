@@ -27,9 +27,9 @@ def sort_by_keys(
     [('b', 'c', 'a'), ('y', 'z', 'x')]
     """
     # Check iterable lengths are equal
-    lengths = [len(x) for x in iterables]
+    lengths = [len(x) for x in iterables] + [len(keys)]
     if len(set(lengths)) > 1:
-        raise ValueError("Iterables must have the same length.")
+        raise ValueError("All iterables and `keys` must have the same length.")
     # Return early if iterables are empty
     if any(l == 0 for l in lengths):
         return [[] for x in iterables]
@@ -56,9 +56,9 @@ def filter_by_keys(*iterables: Sequence, keys: Sequence[bool]) -> list[list]:
     [('a', 'c'), ('x', 'z')]
     """
     # Check iterable lengths are equal
-    lengths = [len(x) for x in iterables]
+    lengths = [len(x) for x in iterables] + [len(keys)]
     if len(set(lengths)) > 1:
-        raise ValueError("Iterables must have the same length.")
+        raise ValueError("All iterables and `keys` must have the same length.")
     # Return early if iterables are empty
     if any(l == 0 for l in lengths):
         return [[] for x in iterables]
