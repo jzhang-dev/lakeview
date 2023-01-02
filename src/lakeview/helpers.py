@@ -2,7 +2,7 @@
 # coding: utf-8
 
 from __future__ import annotations
-from typing import Literal, Callable, Any, Optional
+from typing import Literal, Callable, Any, Optional, TypeVar
 from collections.abc import Iterable, Sequence
 import os
 import pathlib
@@ -12,6 +12,40 @@ import matplotlib as mpl
 from matplotlib.colors import rgb2hex
 import pysam
 from ._type_alias import Color, Identifier
+
+T = TypeVar("T")
+
+def key_sort(sequence: Sequence[T], keys: Sequence[Identifier], reverse: bool = False) -> Sequence[T]:
+    """
+    Sort `sequence` by the values of `keys`.
+
+    >>> x = ['a', 'b', 'c']
+    >>> keys = [3, 1, 2]
+    >>> key_sort(x, keys=keys)
+    ['b', 'c', 'a']
+    """
+    if len(sequence) != len(keys):
+        raise ValueError(f"`sequence` and `keys` have different lengths: {len(sequence)=}; {len(keys)=}.")
+    if len(sequence) == 0:
+        return []
+    zipped_sequence = list(zip(keys, sequence))
+    sorted_zipped_sequence = sorted(zipped_sequence, key=lambda pair: pair[0], reverse=reverse)
+    sorted_sequence = [pair[1] for pair in sorted_zipped_sequence]
+    return sorted_sequence
+
+
+def key_filter(sequence: Sequence[T], keys: Sequence[bool]) -> Sequence[T]:
+    """
+    Filter `sequence` by the values of `keys`.
+
+    >>> x = ['a', 'b', 'c']
+    >>> keys = [True, False, True]
+    >>> key_filter(x, keys=keys)
+    ['a', 'c']
+    """
+    if len(sequence) != len(keys):
+        raise ValueError(f"`sequence` and `keys` have different lengths: {len(sequence)=}; {len(keys)=}.")
+    return [element for element, key in zip(sequence, keys) if key]
 
 
 def sort_by_keys(

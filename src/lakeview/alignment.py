@@ -29,7 +29,7 @@ from matplotlib.path import Path
 from matplotlib.collections import LineCollection
 import pysam
 
-from .helpers import filter_by_keys, sort_by_keys, pack_intervals
+from .helpers import key_filter, key_sort, pack_intervals
 from .plot import get_ax_size
 from ._region_notation import (
     parse_region_notation,
@@ -700,7 +700,7 @@ class SequenceAlignment:
         *,
         max_group_offset: float,
         min_spacing: float,
-    ) -> list[int]:
+    ) -> Sequence[int]:
         # Check each LinkIdentifier only mpas to one GroupIdentifier.
         link_group_dict: dict[LinkIdentifier, GroupIdentifier] = {}
         for link, group in zip(links, groups):
@@ -733,19 +733,19 @@ class SequenceAlignment:
         filter_by,
         color_by,
     ) -> tuple[
-        list[AlignedSegment],
-        list[LinkIdentifier],
-        list[GroupIdentifier],
-        list[Color],
+        Sequence[AlignedSegment],
+        Sequence[LinkIdentifier],
+        Sequence[GroupIdentifier],
+        Sequence[Color],
     ]:
-        segments = self.segments
+        segments: Sequence[AlignedSegment] = self.segments
         n_segments = len(segments)
 
         if segments is None:
             raise ValueError("Alignment has not been loaded.")
 
         # Colors
-        colors: list[Color] = []
+        colors: Sequence[Color] = []
         if color_by is None:
             colors = ["lightgray"] * n_segments
         if isinstance(color_by, str):
@@ -757,7 +757,9 @@ class SequenceAlignment:
             elif color_by == "strand":
                 colors = list(
                     map(
-                        lambda segment: "lightgray" if segment.is_forward else "darkgray",
+                        lambda segment: "lightgray"
+                        if segment.is_forward
+                        else "darkgray",
                         segments,
                     )
                 )
@@ -771,7 +773,7 @@ class SequenceAlignment:
             colors = [color_by(seg) for seg in segments]
 
         # Groups
-        groups: list[GroupIdentifier] = []
+        groups: Sequence[GroupIdentifier] = []
         if group_by is None:
             groups = [0] * n_segments  # Assign all segments into the same group
         if isinstance(group_by, str):
@@ -783,7 +785,9 @@ class SequenceAlignment:
             elif group_by == "proper_pair":
                 groups = [seg.is_proper_pair for seg in segments]
             elif group_by == "strand":
-                groups = ["forward" if seg.is_forward else "reverse" for seg in segments]
+                groups = [
+                    "forward" if seg.is_forward else "reverse" for seg in segments
+                ]
             else:
                 raise ValueError()
         elif isinstance(group_by, Iterable):
@@ -794,7 +798,7 @@ class SequenceAlignment:
             groups = [group_by(seg) for seg in segments]
 
         # Links
-        links: list[LinkIdentifier] = []
+        links: Sequence[LinkIdentifier] = []
         if link_by is None:
             links = list(range(n_segments))  # Do not link segments together
         elif isinstance(link_by, str):
@@ -811,8 +815,8 @@ class SequenceAlignment:
         elif callable(link_by):
             links = [link_by(seg) for seg in segments]
 
-        # Keys for filtering 
-        filter_keys: list[bool] = []
+        # Keys for filtering
+        filter_keys: Sequence[bool] = []
         if filter_by is None:
             pass
         elif isinstance(filter_by, str):
@@ -828,9 +832,9 @@ class SequenceAlignment:
             filter_keys = [filter_by(seg) for seg in segments]
         else:
             raise TypeError(f"Invalid type for `filter_by`: f{type(filter_by)!r}.")
-        
-        # Keys for sorting 
-        sort_keys: list[Identifier] = []
+
+        # Keys for sorting
+        sort_keys: Sequence[Identifier] = []
         if sort_by is None:
             sort_keys = [0] * n_segments
         elif isinstance(sort_by, str):
@@ -851,16 +855,20 @@ class SequenceAlignment:
 
         # Filter segments
         if filter_by is not None:
-            segments, colors, links, groups, sort_keys = filter_by_keys(
-                segments, colors, links, groups, sort_keys, keys=filter_keys
-            )
+            segments = key_filter(segments, filter_keys)
+            colors = key_filter(colors, filter_keys)
+            links = key_filter(links, filter_keys)
+            groups = key_filter(groups, filter_keys)
+            if sort_by is not None:
+                sort_keys = key_filter(sort_keys, filter_keys)
             if not segments:
-                warnings.warn("All segments removed after filtering.")
+                warnings.warn("No segment remains after filtering.")
         # Sort segments
         if sort_by is not None:
-            segments, colors, links, groups = sort_by_keys(
-                segments, colors, links, groups, keys=sort_keys
-            )
+            segments = key_sort(segments, sort_keys)
+            colors = key_sort(colors, sort_keys)
+            links = key_sort(links, sort_keys)
+            groups = key_sort(groups, sort_keys)
 
         return segments, links, groups, colors
 
@@ -926,7 +934,6 @@ class SequenceAlignment:
         show_group_labels: Optional[bool] = None,
         show_group_separators: bool = True,
         max_group_height: float = 1000,
-        show_overheight_markers: bool = False,
         backbones_kw={},
         arrowheads_kw={},
         links_kw={},
@@ -940,7 +947,6 @@ class SequenceAlignment:
         letters_kw={},
         group_labels_kw={},
         group_separators_kw={},
-        overheight_markers_kw={},
     ):
         """
         Draw sequence alignment patterns, in a style similar to `IGH alignment track <https://software.broadinstitute.org/software/igv/alignmentdata#alignmenttrack>`_.
@@ -963,14 +969,7 @@ class SequenceAlignment:
         Groups are ordered by group id.
         Linked reads are ordered by first read in the link.
         """
-        segments = self.segments
-
-        if segments is None:
-            raise ValueError("Alignment has not been loaded.")
-
-        # Get default spacing
-        if min_spacing is None:
-            min_spacing = self._get_default_spacing(segments)
+        segments: Sequence[AlignedSegment] = self.segments
 
         # Parse segment parameters
         segments, links, groups, colors = self._parse_segment_parameters(
@@ -981,6 +980,10 @@ class SequenceAlignment:
             sort_by=sort_by,
         )
 
+        # Get default spacing
+        if min_spacing is None:
+            min_spacing = self._get_default_spacing(segments)
+
         # Get segment offsets
         offsets = self._get_segment_offsets(
             segments,
@@ -990,20 +993,14 @@ class SequenceAlignment:
             min_spacing=min_spacing,
         )
 
-        # Draw overheight markers
-        if show_overheight_markers:
-            self._draw_overheight_markers(
-                ax, segments, groups, offsets, **overheight_markers_kw
-            )
-
-        # Remove segments exceeding `max_group_offset` (overheight segments)
-        segments, links, groups, offsets, colors = filter_by_keys(
-            segments, links, groups, offsets, colors, keys=[y >= 0 for y in offsets]
-        )
-
-        # Get segment height
-        if height is None:
-            height = self._get_default_segment_height(ax, offsets)
+        # Remove segments exceeding `max_group_offset`
+        if not all(y >= 0 for y in offsets):
+            filter_keys = [y >= 0 for y in offsets]
+            segments = key_filter(segments, filter_keys)
+            links = key_filter(links, filter_keys)
+            groups = key_filter(groups, filter_keys)
+            offsets = key_filter(offsets, filter_keys)
+            colors = key_filter(colors, filter_keys)
 
         # Parse group labels
         unique_groups = set(groups)
@@ -1023,6 +1020,10 @@ class SequenceAlignment:
             group_label_dict = {g: group_labels(g) for g in unique_groups}
         elif isinstance(group_labels, Mapping):
             group_label_dict = {g: group_labels[g] for g in unique_groups}
+
+        # Get segment height
+        if height is None:
+            height = self._get_default_segment_height(ax, offsets)
 
         # Draw components
         if show_backbones:
@@ -1574,49 +1575,6 @@ class SequenceAlignment:
                 ls="",
                 **kw,
             )
-
-    def _draw_overheight_markers(
-        self,
-        ax: Axes,
-        segments: Sequence[AlignedSegment],
-        groups: Sequence[GroupIdentifier],
-        offsets: Sequence[int],
-        linewidth: float = 3,
-        color: Color = "black",
-        **kw,
-    ) -> None:
-        # TODO: remove this?
-        # Get upper limit (minimum offset) of each group
-        group_min_offset_dict: dict[GroupIdentifier, int] = {}
-        for group, y in zip(groups, offsets):
-            if y < 0:
-                continue
-            if group not in group_min_offset_dict:
-                group_min_offset_dict[group] = y
-            else:
-                group_min_offset_dict[group] = min(group_min_offset_dict[group], y)
-        # Get overheight segments
-        overheight_segments, overheight_groups = filter_by_keys(
-            segments, groups, keys=[y < 0 for y in offsets]
-        )
-        # Draw overheight markers
-        overheight_lines: list[Line] = []
-        for segment, group in zip(overheight_segments, overheight_groups):
-            y = group_min_offset_dict[group]
-            x0 = segment.reference_start
-            x1 = segment.reference_end
-            overheight_lines.append(((x0, y), (x1, y)))
-        print(overheight_lines)
-        ax.add_collection(
-            LineCollection(
-                overheight_lines,
-                linewidths=linewidth,
-                colors=color,
-                zorder=10,
-                facecolors="none",
-                **kw,
-            )
-        )
 
     @functools.cached_property
     def _reference_bases(self) -> dict[int, Optional[str]]:
