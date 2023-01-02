@@ -963,11 +963,11 @@ class SequenceAlignment:
         :param height: Segment height in points. The default is to infer automatically.
         :param min_spacing: The minimum horizontal spacing between two adjacent segments in the same row, in terms of number of bases. The default is to infer automatically.
         :param max_rows: The maximum number of rows to layout segments. Excess segments will not be drawn. If multiple segment groups exist, this parameter limits the maximum number of rows *per group*. 
+        
         .. note::
            For a detailed explaination on how to use `filter_by`, `sort_by`, `link_by`, `group_by`, and `color_by`, see :ref:`Custom layout`.
 
-        Groups are ordered by group id.
-        Linked reads are ordered by first read in the link.
+        Groups are ordered by group id. Linked reads are ordered by first read in the link.
         """
         segments: Sequence[AlignedSegment] = self.segments
 
