@@ -1109,17 +1109,18 @@ class SequenceAlignment:
         **kw,
     ) -> None:
         lines: list[tuple[Point, Point]] = []
-        for seg, y in zip(segments, offsets):
+        line_colors: list[Color] = []
+        for seg, y, color in zip(segments, offsets, colors):
             for block_start, block_end in seg._get_normalized_blocks():
                 start_point = (block_start - 0.5, y)
                 end_point = (block_end - 0.5, y)
                 lines.append((start_point, end_point))
-        # Match line
+                line_colors.append(color)
         ax.add_collection(
             LineCollection(
                 lines,
                 linewidths=height,
-                colors=colors[0] if len(set(colors)) == 1 else colors,
+                colors=colors[0] if len(set(colors)) == 1 else line_colors,
                 zorder=0,
                 facecolors="none",
             )
