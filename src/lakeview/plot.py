@@ -44,7 +44,7 @@ def get_random_colors(n: int, *, seed=0, cmap='hsv') -> list[Color]:
 
 
 def draw_rigid_polygon(
-    ax,
+    ax: Axes,
     shape: Sequence[Point],
     position: Point,
     position_transform: mpl.transforms.Transform,
@@ -105,3 +105,14 @@ def scientific_notation(
     # Format with mathtext
     s = quote + coefficient + r"\times 10^" + "{" + exponent + "}" + quote
     return s
+
+
+# TODO: format as 4.55 kb; check if this should be a class; type annotation; a better name
+def base_formatter(unit="mb", fmt="{:.2f}"):
+    n = dict(bp=1, kb=int(1e3), mb=int(1e6), gb=int(1e9))[unit.lower()]
+
+    @mpl.ticker.FuncFormatter
+    def unit_formatter(x, pos):
+        return fmt.format(x / n)
+
+    return unit_formatter

@@ -48,7 +48,7 @@ def key_filter(sequence: Sequence[T], keys: Sequence[bool]) -> Sequence[T]:
     return [element for element, key in zip(sequence, keys) if key]
     
 
-def pack_intervals(intervals: Iterable[tuple[float, float]]) -> list[int]:
+def pack_intervals(intervals: Iterable[tuple[float, float]]) -> Sequence[int]:
     """
     Assign an non-negative offset to each input interval so that intervals sharing the same offset will not overlap with each other, while minimising offset values.
     Intervals are treated as being closed.

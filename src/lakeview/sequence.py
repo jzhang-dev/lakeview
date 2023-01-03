@@ -12,6 +12,7 @@ from Bio import SeqIO
 
 from . import util
 
+# Optional: remove this module
 
 Dot = collections.namedtuple("Dot", ["x", "y"])
 

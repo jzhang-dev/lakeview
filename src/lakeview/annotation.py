@@ -13,8 +13,8 @@ from ._region_notation import (
     normalize_region_notation,
     get_region_notation,
 )
-from .helpers import key_filter, key_sort, pack_intervals
 from .plot import get_ax_size
+from ._layout import key_filter, key_sort, pack_intervals
 from ._type_alias import GroupIdentifier, Color, Axes, Identifier
 
 @dataclass
