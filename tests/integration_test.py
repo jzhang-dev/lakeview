@@ -5,7 +5,7 @@ import os, gzip
 import pytest
 import matplotlib.pyplot as plt
 import lakeview as lv
-from lakeview.plot import base_formatter
+from lakeview.plot import BasePairFormatter
 
 
 def test_SKBR3():
@@ -37,7 +37,7 @@ def test_SKBR3():
     gv.axes[3].set_ylabel("PacBio")
     gv.set_xlabel("chr17")
     gv.axes[-1].xaxis.set_major_formatter(
-        base_formatter(unit="mb", fmt="{:.3f}")
+        BasePairFormatter("Mb")
     )
     gv.set_title("SKBR3")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
@@ -124,7 +124,7 @@ def test_IGH():
     gv.set_xlim((105679000, 105776000))
     gv.set_xlabel(CHROMOSOME)
     gv.set_title("HG002 IGH PacBio + Gencode")
-    gv.xaxis.set_major_formatter(base_formatter(unit="mb", fmt="{:.3f}"))
+    gv.xaxis.set_major_formatter(BasePairFormatter("Mb"))
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
 
@@ -155,9 +155,9 @@ def test_GAPDH_RNAseq():
     )
     annotation_painter.draw_transcripts(gv.axes[2])
     gv.set_xlim(6.643e6, 6.648e6)
-    gv.set_xlabel(f"{CHROMOSOME} (Mb)")
+    gv.set_xlabel(f"{CHROMOSOME}")
     gv.axes[-1].xaxis.set_major_formatter(
-        base_formatter(unit="mb", fmt="{:.3f}")
+        BasePairFormatter("Mb")
     )
     gv.set_title(r"GM12878 $\it{GAPDH}$ RNAseq")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
@@ -182,7 +182,7 @@ def test_SNURF_methylation():
     ax.set_title(r"$\it{SNURF}$ differentially methylated region")
     ax.set_xlim(24.953e6, 24.958e6)
     ax.set_xlabel("chr15 (Mb)")
-    ax.xaxis.set_major_formatter(base_formatter(unit="mb", fmt="{:.3f}"))
+    ax.xaxis.set_major_formatter(BasePairFormatter("Mb", show_suffix=False))
     fig.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
 

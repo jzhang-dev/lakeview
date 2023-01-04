@@ -49,7 +49,6 @@ from ._type_alias import (
 )
 
 
-
 class CoverageDepth:
     @classmethod
     def from_samtools_depth_output(self, file):
@@ -963,8 +962,8 @@ class SequenceAlignment:
         :param group_labels: Text labels for each group. The default is to use group identifiers as labels. This parameter is only valid when a custom value for `group_by` is used.
         :param height: Segment height in points. The default is to infer automatically.
         :param min_spacing: The minimum horizontal spacing between two adjacent segments in the same row, in terms of number of bases. The default is to infer automatically.
-        :param max_rows: The maximum number of rows to layout segments. Excess segments will not be drawn. If multiple segment groups exist, this parameter limits the maximum number of rows *per group*. 
-        
+        :param max_rows: The maximum number of rows to layout segments. Excess segments will not be drawn. If multiple segment groups exist, this parameter limits the maximum number of rows *per group*.
+
         .. note::
            For a detailed explaination on how to use `filter_by`, `sort_by`, `link_by`, `group_by`, and `color_by`, see :ref:`Custom layout`.
 
@@ -1469,16 +1468,16 @@ class SequenceAlignment:
 
     def _draw_links(
         self,
-        ax,
-        segments,
-        offsets,
-        links,
+        ax: Axes,
+        segments: Sequence[AlignedSegment],
+        offsets: Sequence[int],
+        links: Sequence[LinkIdentifier],
         *,
-        linewidth=1.5,
-        color="lightgray",
-        linestyle="-",
+        linewidth: float = 1.5,
+        color: Color = "lightgray",
+        linestyle: str = "-",
         **kw,
-    ):
+    ) -> None:
         link_ls_dict: dict[LinkIdentifier, _LinkedSegment] = self._link_segments(
             segments, links
         )

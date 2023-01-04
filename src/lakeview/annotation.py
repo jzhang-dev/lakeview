@@ -367,6 +367,7 @@ class GeneAnnotation:
     ): 
         genes = self.genes
         intervals = [(g.start, g.end) for g in genes]
+        offsets: Sequence[int]
         if allow_overlaps:
             offsets = [0] * len(genes)
         else:

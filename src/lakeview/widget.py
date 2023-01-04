@@ -10,7 +10,7 @@ from IPython.display import display
 import ipywidgets
 from ._type_alias import Figure, Axes
 
-# TODO: auto x tick formatter
+# TODO: auto BasePairFormatter
 
 class GenomeViewer:
     def __init__(

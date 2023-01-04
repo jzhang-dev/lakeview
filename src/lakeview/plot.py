@@ -30,7 +30,7 @@ def get_cmap_colors(
     return colors
 
 
-def get_random_colors(n: int, *, seed=0, cmap='hsv') -> list[Color]:
+def get_random_colors(n: int, *, seed=0, cmap="hsv") -> list[Color]:
     """
     Returns `n` random colors selected uniformly from `cmap`.
 
@@ -107,12 +107,54 @@ def scientific_notation(
     return s
 
 
-# TODO: format as 4.55 kb; check if this should be a class; type annotation; a better name
-def base_formatter(unit="mb", fmt="{:.2f}"):
-    n = dict(bp=1, kb=int(1e3), mb=int(1e6), gb=int(1e9))[unit.lower()]
+# def base_formatter(unit="mb", fmt="{:.2f}"):
+#     n = dict(bp=1, kb=int(1e3), mb=int(1e6), gb=int(1e9))[unit.lower()]
 
-    @mpl.ticker.FuncFormatter
-    def unit_formatter(x, pos):
-        return fmt.format(x / n)
+#     @mpl.ticker.FuncFormatter
+#     def unit_formatter(x, pos):
+#         return fmt.format(x / n)
 
-    return unit_formatter
+#     return unit_formatter
+
+
+class BasePairFormatter(mpl.ticker.FuncFormatter):
+    """
+    A Matplotlib `tick formatter <https://matplotlib.org/stable/api/ticker_api.html#tick-formatting>`_ for common base pair units ('bp', 'kb', 'Mb', 'Gb', 'Tb').
+
+    :param unit: Base pair unit.
+    :param decimals: The number of decimal places to show for the coefficient.
+    :param show_suffix: Whether to show the unit as a suffix.
+
+    >>> formatter = BasePairFormatter('kb')
+    >>> formatter(24310)
+    '24.310 kb'
+    >>> formatter = BasePairFormatter('Mb', 2, show_suffix=False)
+    >>> formatter(844_293_192)
+    '844.29'
+    """
+
+    def __init__(
+        self,
+        unit: Literal["bp", "kb", "Mb", "Gb", "Tb"],
+        decimals: int = 3,
+        *,
+        show_suffix: bool = True,
+    ):
+        UNIT_DIVISOR_DICT: dict[str, int] = dict(
+            bp=1, kb=int(1e3), Mb=int(1e6), Gb=int(1e9), Tb=int(1e12)
+        )
+        if unit in UNIT_DIVISOR_DICT:
+            unit_divisor: int = UNIT_DIVISOR_DICT[unit]
+        else:
+            raise ValueError(
+                f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNIT_DIVISOR_DICT)!r}."
+            )
+
+        def formatter_function(x: float, pos) -> str:
+            tick_label = format(x / unit_divisor, f".{decimals}f")
+            #print(unit_divisor)
+            if show_suffix:
+                tick_label += " " + unit
+            return tick_label
+
+        super().__init__(formatter_function)
