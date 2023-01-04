@@ -132,16 +132,8 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
         :param decimals: The number of decimal places to show for the coefficient. The default is 1 for 'bp', or 3 for other values of `unit`.
         :param show_suffix: Whether to show the unit as a suffix.
         """
-
-        UNIT_DIVISOR_DICT: dict[str, int] = dict(
-            bp=1, kb=int(1e3), Mb=int(1e6), Gb=int(1e9), Tb=int(1e12)
-        )
-        if unit in UNIT_DIVISOR_DICT:
-            unit_divisor: int = UNIT_DIVISOR_DICT[unit]
-        else:
-            raise ValueError(
-                f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNIT_DIVISOR_DICT)!r}."
-            )
+        unit_divisor = self._get_unit_divisor(unit)
+        
         if decimals is None:
             if unit == 'bp':
                 decimals = 1
@@ -156,3 +148,16 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
             return tick_label
 
         super().__init__(formatter_function)
+
+    @staticmethod
+    def _get_unit_divisor(unit: Literal["bp", "kb", "Mb", "Gb", "Tb"]) -> int:
+        UNIT_DIVISOR_DICT: dict[str, int] = dict(
+            bp=1, kb=int(1e3), Mb=int(1e6), Gb=int(1e9), Tb=int(1e12)
+        )
+        if unit in UNIT_DIVISOR_DICT:
+            unit_divisor: int = UNIT_DIVISOR_DICT[unit]
+            return unit_divisor
+        else:
+            raise ValueError(
+                f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNIT_DIVISOR_DICT)!r}."
+            )

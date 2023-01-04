@@ -7,6 +7,7 @@ API
 
    SequenceAlignment
    GeneAnnotation
+   GenomeViewer
    plot
    remote
    type_alias
