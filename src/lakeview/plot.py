@@ -107,23 +107,10 @@ def scientific_notation(
     return s
 
 
-# def base_formatter(unit="mb", fmt="{:.2f}"):
-#     n = dict(bp=1, kb=int(1e3), mb=int(1e6), gb=int(1e9))[unit.lower()]
-
-#     @mpl.ticker.FuncFormatter
-#     def unit_formatter(x, pos):
-#         return fmt.format(x / n)
-
-#     return unit_formatter
-
 
 class BasePairFormatter(mpl.ticker.FuncFormatter):
     """
-    A Matplotlib `tick formatter <https://matplotlib.org/stable/api/ticker_api.html#tick-formatting>`_ for common base pair units ('bp', 'kb', 'Mb', 'Gb', 'Tb').
-
-    :param unit: Base pair unit.
-    :param decimals: The number of decimal places to show for the coefficient.
-    :param show_suffix: Whether to show the unit as a suffix.
+    A Matplotlib `tick formatter <https://matplotlib.org/stable/api/ticker_api.html#tick-formatting>`_ for common base pair units (bp, kb, Mb, Gb, Tb).
 
     >>> formatter = BasePairFormatter('kb')
     >>> formatter(24310)
@@ -136,10 +123,16 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
     def __init__(
         self,
         unit: Literal["bp", "kb", "Mb", "Gb", "Tb"],
-        decimals: int = 3,
+        decimals: int | None = None,
         *,
         show_suffix: bool = True,
     ):
+        """
+        :param unit: Base pair unit.
+        :param decimals: The number of decimal places to show for the coefficient. The default is 1 for 'bp', or 3 for other values of `unit`.
+        :param show_suffix: Whether to show the unit as a suffix.
+        """
+
         UNIT_DIVISOR_DICT: dict[str, int] = dict(
             bp=1, kb=int(1e3), Mb=int(1e6), Gb=int(1e9), Tb=int(1e12)
         )
@@ -149,6 +142,11 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
             raise ValueError(
                 f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNIT_DIVISOR_DICT)!r}."
             )
+        if decimals is None:
+            if unit == 'bp':
+                decimals = 1
+            else:
+                decimals = 3
 
         def formatter_function(x: float, pos) -> str:
             tick_label = format(x / unit_divisor, f".{decimals}f")
