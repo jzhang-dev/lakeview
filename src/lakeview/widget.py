@@ -16,7 +16,7 @@ from .plot import BasePairFormatter
 
 class GenomeViewer:
     """
-    An interactive widget for viewing genomic data in Jupyter Notebooks. 
+    An interactive widget for viewing genomic data in Jupyter Notebooks.
     """
 
     def __init__(
@@ -26,7 +26,6 @@ class GenomeViewer:
         height_ratios: Optional[Sequence[float]] = None,
         figsize: tuple[float, float] = (10, 10),
     ) -> None:
-        self._initial_xlim: Optional[tuple[float, float]] = None
         with plt.ioff():
             fig, axes = plt.subplots(
                 nrows=tracks,
@@ -38,10 +37,18 @@ class GenomeViewer:
                 gridspec_kw=dict(height_ratios=height_ratios),
                 constrained_layout=True,
             )
-        self.figure: Figure = fig
-        self.axes: list[Axes] = list(axes[:, 0])
-        self.xaxis.set_major_locator(MaxNLocator(5))
-        self._init_app()
+        self._figure = fig
+        self._axes = axes[:, 0]
+        self._app: ipywidgets.AppLayout | None = None
+        self._initial_xlim: Optional[tuple[float, float]] = None
+
+    @property
+    def figure(self) -> Figure:
+        return self._figure
+
+    @property
+    def axes(self) -> Sequence[Axes]:
+        return self._axes
 
     def _init_app(self) -> None:
         center_widget = ipywidgets.Output()
@@ -85,9 +92,15 @@ class GenomeViewer:
         self._center_widget = center_widget
         self._footer_widget = footer_widget
         # self.update_display()
-        self.app = ipywidgets.AppLayout(
+        self._app = ipywidgets.AppLayout(
             center=center_widget, footer=footer_widget, pane_heights=[0, 1, "100px"]
         )
+
+    @property
+    def app(self) -> ipywidgets.AppLayout:
+        if self._app is None:
+            self._init_app()
+        return self._app
 
     @property
     def xaxis(self) -> mpl.axis.XAxis:
