@@ -50,66 +50,61 @@ def test_download_bam() -> None:
 
 def test_group_segments() -> None:
     CHROMOSOME = "17"
-    p = lv.SequenceAlignment.from_file("tests/data/SKBR3_Illumina_550bp_pcrFREE.bam", CHROMOSOME)
-    kw = dict(filter_by=None, link_by=None, color_by=None, sort_by=None)
-    # Group by strand
-    segments, links, groups, colors = p._parse_segment_parameters(
-        group_by="strand", **kw
+    p = lv.SequenceAlignment.from_file(
+        "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam", CHROMOSOME
     )
-    c = collections.Counter(groups)
+    # Group by strand
+    group_identifiers = p._get_group_identifiers(group_by="strand")
+    c = collections.Counter(group_identifiers)
     assert c["forward"] == 905
     assert c["reverse"] == 895
 
-
     # Group by proper pair
-    segments, links, groups, colors = p._parse_segment_parameters(
-        group_by="proper_pair", **kw
-    )
-    c = collections.Counter(groups)
+    group_identifiers = p._get_group_identifiers(group_by="proper_pair")
+    c = collections.Counter(group_identifiers)
     assert c[True] == 1692
     assert c[False] == 108
 
     # Group by custom function
-    segments, links, groups, colors = p._parse_segment_parameters(
-        group_by=lambda seg: seg.query_name[-1], **kw
+    group_identifiers = p._get_group_identifiers(
+        group_by=lambda seg: seg.query_name[-1]
     )
-    c = collections.Counter(groups)
-    assert groups[:10] == ["2", "7", "3", "0", "0", "1", "0", "0", "8", "1"]
+    c = collections.Counter(group_identifiers)
+    assert group_identifiers[:10] == ["2", "7", "3", "0", "0", "1", "0", "0", "8", "1"]
 
 
 def test_filter_segments() -> None:
     CHROMOSOME = "17"
-    p = lv.SequenceAlignment.from_file("tests/data/SKBR3_Illumina_550bp_pcrFREE.bam", CHROMOSOME)
-    kw = dict(group_by=None, link_by=None, color_by=None, sort_by=None)
-
-    # Group by proper pair
-    segments, links, groups, colors = p._parse_segment_parameters(
-        filter_by=lambda seg: seg.is_proper_pair, **kw
+    p = lv.SequenceAlignment.from_file(
+        "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam", CHROMOSOME
     )
-    assert len(segments) == 1692
+    # Filter by proper pair
+    filter_keys = p._get_filter_keys(filter_by=lambda seg: seg.is_proper_pair)
+    assert sum(filter_keys) == 1692
 
 
 def test_link_segments() -> None:
     CHROMOSOME = "17"
     p = lv.SequenceAlignment.from_file("tests/data/SKBR3_PacBio.bam", CHROMOSOME)
-    kw = dict(group_by=None, filter_by=None, color_by=None, sort_by=None)
 
     # Link by query name
-    segments, links, groups, colors = p._parse_segment_parameters(link_by="name", **kw)
-    c = collections.Counter(links)
+    link_identifiers = p._get_link_identifiers(link_by="name")
+    c = collections.Counter(link_identifiers)
     assert len(c) == 184
+    # Link by read pair
+    link_identifiers = p._get_link_identifiers(link_by="pair")
+    c = collections.Counter(link_identifiers)
+    assert len(c) == 193
 
 
 def test_sort_segments() -> None:
     CHROMOSOME = "17"
     p = lv.SequenceAlignment.from_file("tests/data/SKBR3_PacBio.bam", CHROMOSOME)
-    kw = dict(group_by=None, filter_by=None, color_by=None, link_by=None)
 
-    # Link by segment length
-    segments, links, groups, colors = p._parse_segment_parameters(
-        sort_by="length", **kw
-    )
-    assert [seg.query_alignment_length for seg in segments[:5]] == [
+    # Sort by segment length
+    sort_keys = p._get_sort_keys(sort_by="length")
+    sorted_segments = lv._layout.key_sort(p.segments, sort_keys)
+    assert [seg.query_alignment_length for seg in sorted_segments[:5]] == [
         31541,
         29597,
         26793,
@@ -117,10 +112,10 @@ def test_sort_segments() -> None:
         22501,
     ]
     assert (
-        segments[0].query_alignment_length
-        >= segments[10].query_alignment_length
-        >= segments[50].query_alignment_length
-        >= segments[-1].query_alignment_length
+        sorted_segments[0].query_alignment_length
+        >= sorted_segments[10].query_alignment_length
+        >= sorted_segments[50].query_alignment_length
+        >= sorted_segments[-1].query_alignment_length
     )
 
 

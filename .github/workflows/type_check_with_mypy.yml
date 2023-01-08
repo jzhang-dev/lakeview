@@ -18,3 +18,4 @@ jobs:
       run: |
         pip install mypy
         mypy src/lakeview/*.py
+        mypy tests/*.py

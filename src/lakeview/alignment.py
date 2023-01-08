@@ -501,12 +501,14 @@ class AlignedSegment:
 
     @functools.cached_property
     def _pair_identifier(self) -> tuple[int, int] | None:
-        if self.wrapped.mate_is_unmapped: # Mate is not mapped
+        if self.wrapped.mate_is_unmapped:  # Mate is not mapped
             return None
-        if self.wrapped.reference_id != self.wrapped.next_reference_id: # Mate is mapped to another reference sequence
+        if (
+            self.wrapped.reference_id != self.wrapped.next_reference_id
+        ):  # Mate is mapped to another reference sequence
             return None
-        self_reference_start:int = self.reference_start
-        mate_reference_start:int = self.wrapped.next_reference_start
+        self_reference_start: int = self.reference_start
+        mate_reference_start: int = self.wrapped.next_reference_start
         min_reference_start: int = min([self_reference_start, mate_reference_start])
         max_reference_start: int = max([self_reference_start, mate_reference_start])
         return (min_reference_start, max_reference_start)
@@ -736,82 +738,64 @@ class SequenceAlignment:
             y = max(offsets) + 2
         return list(offsets)
 
-    def _get_link_identifiers(self, link_by) -> Sequence[LinkIdentifier]:
+    def _get_filter_keys(
+        self, filter_by: Callable[[AlignedSegment], bool] | Iterable[bool] | str | None
+    ) -> Sequence[bool]:
         segments = self.segments
-        link_identifiers: Sequence[LinkIdentifier] = []
-        if link_by is None:
-            link_identifiers = list(range(len(segments)))  # Do not link segments together
-        elif isinstance(link_by, str):
-            if link_by == "pair":
-                link_identifiers = []
-                link_id: tuple[int, int]
-                for i, segment in enumerate(segments):
-                    pair_id = segment._pair_identifier
-                    if pair_id is None:
-                        link_id = (-i-1, -i-1) # Arbitrary id to make sure non-paired reads are not linked together
-                    else:
-                        link_id = pair_id
-                    link_identifiers.append(link_id)
-            elif link_by == "name":
-                link_identifiers = [seg.query_name for seg in segments]
+        filter_keys: Sequence[bool] = []
+        if filter_by is None:
+            pass
+        elif isinstance(filter_by, str):
+            if filter_by == "no_secondary":
+                filter_keys = [not seg.is_secondary for seg in segments]
             else:
                 raise ValueError()
-        elif isinstance(link_by, Iterable):
-            link_identifiers = list(link_by)
-            if len(link_identifiers) != len(segments):
+        elif isinstance(filter_by, Iterable):
+            filter_keys = list(filter_by)  # type: ignore
+            if len(filter_keys) != len(segments):
                 raise ValueError()
-        elif callable(link_by):
-            link_identifiers = [link_by(seg) for seg in segments]
-        return link_identifiers
+        elif callable(filter_by):
+            filter_keys = [filter_by(seg) for seg in segments]
+        else:
+            raise TypeError(f"Invalid type for `filter_by`: f{type(filter_by)!r}.")
+        return filter_keys
 
-
-    def _get_group_identifiers(self, group_by) -> Sequence[GroupIdentifier]:
-        segments = self.segments
-        group_identifiers: Sequence[GroupIdentifier] = []
-        if group_by is None:
-            group_identifiers = [0] * len(segments)  # Assign all segments into the same group
-        if isinstance(group_by, str):
-            if group_by == "haplotype":
-                group_identifiers = [
-                    seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
-                    for seg in segments
-                ]
-            elif group_by == "proper_pair":
-                group_identifiers = [seg.is_proper_pair for seg in segments]
-            elif group_by == "strand":
-                group_identifiers = [
-                    "forward" if seg.is_forward else "reverse" for seg in segments
-                ]
-            else:
-                raise ValueError()
-        elif isinstance(group_by, Iterable):
-            group_identifiers = list(group_by)
-            if len(group_identifiers) != len(segments):
-                raise ValueError()
-        if callable(group_by):
-            group_identifiers = [group_by(seg) for seg in segments]
-        return group_identifiers
-
-    def _parse_segment_parameters(
+    def _get_sort_keys(
         self,
-        *,
-        sort_by,
-        link_by,
-        group_by,
-        filter_by,
-        color_by,
-    ) -> tuple[
-        Sequence[AlignedSegment],
-        Sequence[LinkIdentifier],
-        Sequence[GroupIdentifier],
-        Sequence[Color],
-    ]:
-        segments: Sequence[AlignedSegment] = self.segments
+        sort_by: Callable[[AlignedSegment], Identifier]
+        | Iterable[Identifier]
+        | Literal["length", "start"]
+        | None,
+    ) -> Sequence[Identifier]:
+        segments = self.segments
+        sort_keys: Sequence[Identifier] = []
+        if sort_by is None:
+            sort_keys = [0] * len(segments)
+        elif isinstance(sort_by, str):
+            if sort_by == "start":
+                sort_keys = [seg.reference_start for seg in segments]
+            elif sort_by == "length":
+                sort_keys = [-seg.query_alignment_length for seg in segments]
+            else:
+                raise ValueError()
+        elif isinstance(sort_by, Iterable):
+            sort_keys = list(sort_by)
+            if len(sort_keys) != len(segments):
+                raise ValueError()
+        elif callable(sort_by):
+            sort_keys = [sort_by(seg) for seg in segments]
+        else:
+            raise TypeError(f"Invalid type for `sort_by`: f{type(sort_by)!r}.")
+        return sort_keys
 
-        if segments is None:
-            raise ValueError("Alignment has not been loaded.")
-
-        # Colors
+    def _get_segment_colors(
+        self,
+        color_by: Callable[[AlignedSegment], Color]
+        | Iterable[Color]
+        | Literal["proper_pair", "strand"]
+        | None,
+    ) -> Sequence[Color]:
+        segments = self.segments
         colors: Sequence[Color] = []
         if color_by is None:
             colors = ["lightgray"] * len(segments)
@@ -838,69 +822,82 @@ class SequenceAlignment:
                 raise ValueError()
         elif callable(color_by):
             colors = [color_by(seg) for seg in segments]
+        return colors
 
-        # Group identifiers
-        group_identifiers = self._get_group_identifiers(group_by)
-
-        # Link identifiers
-        link_identifiers = self._get_link_identifiers(link_by)
-
-        # Keys for filtering
-        filter_keys: Sequence[bool] = []
-        if filter_by is None:
-            pass
-        elif isinstance(filter_by, str):
-            if filter_by == "no_secondary":
-                filter_keys = [not seg.is_secondary for seg in segments]
+    def _get_link_identifiers(
+        self,
+        link_by: Callable[[AlignedSegment], LinkIdentifier]
+        | Iterable[LinkIdentifier]
+        | Literal["name", "pair"]
+        | None,
+    ) -> Sequence[LinkIdentifier]:
+        segments = self.segments
+        link_identifiers: Sequence[LinkIdentifier] = []
+        if link_by is None:
+            link_identifiers = list(
+                range(len(segments))
+            )  # Do not link segments together
+        elif isinstance(link_by, str):
+            if link_by == "pair":
+                link_identifiers = []
+                link_id: tuple[int, int]
+                for i, segment in enumerate(segments):
+                    pair_id = segment._pair_identifier
+                    if pair_id is None:
+                        link_id = (
+                            -i - 1,
+                            -i - 1,
+                        )  # Arbitrary id to make sure non-paired reads are not linked together
+                    else:
+                        link_id = pair_id
+                    link_identifiers.append(link_id)
+            elif link_by == "name":
+                link_identifiers = [seg.query_name for seg in segments]
             else:
                 raise ValueError()
-        elif isinstance(filter_by, Iterable):
-            filter_keys = list(filter_by)  # type: ignore
-            if len(filter_keys) != len(segments):
+        elif isinstance(link_by, Iterable):
+            link_identifiers = list(link_by)
+            if len(link_identifiers) != len(segments):
                 raise ValueError()
-        elif callable(filter_by):
-            filter_keys = [filter_by(seg) for seg in segments]
-        else:
-            raise TypeError(f"Invalid type for `filter_by`: f{type(filter_by)!r}.")
+        elif callable(link_by):
+            link_identifiers = [link_by(seg) for seg in segments]
+        return link_identifiers
 
-        # Keys for sorting
-        sort_keys: Sequence[Identifier] = []
-        if sort_by is None:
-            sort_keys = [0] * len(segments)
-        elif isinstance(sort_by, str):
-            if sort_by == "start":
-                sort_keys = [seg.reference_start for seg in segments]
-            elif sort_by == "length":
-                sort_keys = [-seg.query_alignment_length for seg in segments]
+    def _get_group_identifiers(
+        self,
+        group_by: Callable[[AlignedSegment], GroupIdentifier]
+        | Iterable[GroupIdentifier]
+        | Literal["haplotype", "proper_pair", "strand"]
+        | None,
+    ) -> Sequence[GroupIdentifier]:
+        segments = self.segments
+        group_identifiers: Sequence[GroupIdentifier] = []
+        if group_by is None:
+            group_identifiers = [0] * len(
+                segments
+            )  # Assign all segments into the same group
+        if isinstance(group_by, str):
+            if group_by == "haplotype":
+                group_identifiers = [
+                    seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
+                    for seg in segments
+                ]
+            elif group_by == "proper_pair":
+                group_identifiers = [seg.is_proper_pair for seg in segments]
+            elif group_by == "strand":
+                group_identifiers = [
+                    "forward" if seg.is_forward else "reverse" for seg in segments
+                ]
             else:
                 raise ValueError()
-        elif isinstance(sort_by, Iterable):
-            sort_keys = list(sort_by)
-            if len(sort_keys) != len(segments):
+        elif isinstance(group_by, Iterable):
+            group_identifiers = list(group_by)
+            if len(group_identifiers) != len(segments):
                 raise ValueError()
-        elif callable(sort_by):
-            sort_keys = [sort_by(seg) for seg in segments]
-        else:
-            raise TypeError(f"Invalid type for `sort_by`: f{type(sort_by)!r}.")
+        if callable(group_by):
+            group_identifiers = [group_by(seg) for seg in segments]
+        return group_identifiers
 
-        # Filter segments
-        if filter_by is not None:
-            segments = key_filter(segments, filter_keys)
-            colors = key_filter(colors, filter_keys)
-            link_identifiers = key_filter(link_identifiers, filter_keys)
-            group_identifiers = key_filter(group_identifiers, filter_keys)
-            if sort_by is not None:
-                sort_keys = key_filter(sort_keys, filter_keys)
-            if not segments:
-                warnings.warn("No segment remains after filtering.")
-        # Sort segments
-        if sort_by is not None:
-            segments = key_sort(segments, sort_keys)
-            colors = key_sort(colors, sort_keys)
-            link_identifiers = key_sort(link_identifiers, sort_keys)
-            group_identifiers = key_sort(group_identifiers, sort_keys)
-
-        return segments, link_identifiers, group_identifiers, colors
 
     def _get_default_segment_height(
         self, ax: Axes, offsets, *, min_height=2, max_height=10
@@ -1001,14 +998,29 @@ class SequenceAlignment:
         """
         segments: Sequence[AlignedSegment] = self.segments
 
-        # Parse segment parameters
-        segments, link_identifiers, group_identifiers, colors = self._parse_segment_parameters(
-            filter_by=filter_by,
-            group_by=group_by,
-            link_by=link_by,
-            color_by=color_by,
-            sort_by=sort_by,
-        )
+        colors = self._get_segment_colors(color_by)
+        group_identifiers = self._get_group_identifiers(group_by)
+        link_identifiers = self._get_link_identifiers(link_by)
+        filter_keys = self._get_filter_keys(filter_by)
+        sort_keys = self._get_sort_keys(sort_by)
+        
+        # Filter segments
+        if filter_by is not None:
+            segments = key_filter(segments, filter_keys)
+            colors = key_filter(colors, filter_keys)
+            link_identifiers = key_filter(link_identifiers, filter_keys)
+            group_identifiers = key_filter(group_identifiers, filter_keys)
+            if sort_by is not None:
+                sort_keys = key_filter(sort_keys, filter_keys)
+            if not segments:
+                warnings.warn("No segment remains after filtering.")
+        
+        # Sort segments
+        if sort_by is not None:
+            segments = key_sort(segments, sort_keys)
+            colors = key_sort(colors, sort_keys)
+            link_identifiers = key_sort(link_identifiers, sort_keys)
+            group_identifiers = key_sort(group_identifiers, sort_keys)
 
         # Get default spacing
         if min_spacing is None:
@@ -1131,10 +1143,16 @@ class SequenceAlignment:
             show_group_labels is None and group_by is not None
         ):
             self._draw_group_labels(
-                ax, group_identifiers, offsets, group_labels=group_label_dict, **group_labels_kw
+                ax,
+                group_identifiers,
+                offsets,
+                group_labels=group_label_dict,
+                **group_labels_kw,
             )
         if show_group_separators is True:
-            self._draw_group_separators(ax, group_identifiers, offsets, **group_separators_kw)
+            self._draw_group_separators(
+                ax, group_identifiers, offsets, **group_separators_kw
+            )
 
         # Set axis limits
         ax.set_xlim(
@@ -1484,7 +1502,15 @@ class SequenceAlignment:
             )
 
     def _draw_group_separators(
-        self, ax, group_identifiers, offsets, *, linewidth=1, color="gray", linestyle="-", **kw
+        self,
+        ax,
+        group_identifiers,
+        offsets,
+        *,
+        linewidth=1,
+        color="gray",
+        linestyle="-",
+        **kw,
     ):
         if len(set(group_identifiers)) <= 1:  # Only one group
             return
