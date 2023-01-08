@@ -790,6 +790,7 @@ class SequenceAlignment:
                 raise ValueError()
         if callable(group_by):
             group_identifiers = [group_by(seg) for seg in segments]
+        return group_identifiers
 
     def _parse_segment_parameters(
         self,
