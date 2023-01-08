@@ -6,7 +6,7 @@ from typing import Union, Literal, Tuple, Sequence
 from collections.abc import Hashable
 import matplotlib as mpl
 
-Identifier = Union[int , float , str , Tuple[Hashable]]
+Identifier = Union[int , float , str , Tuple[Hashable, ...]]
 "Identifier"
 LinkIdentifier = Identifier
 "Link identifier"
