@@ -499,6 +499,16 @@ class AlignedSegment:
         """
         return self._cigar.reference_skips
 
+    @functools.cached_property
+    def _pair_identifier(self) -> tuple(int, int) | None:
+        if self.wrapped.mate_is_unmapped: # Mate is not mapped
+            return None
+        if self.wrapped.reference_id != self.wrapped.next_reference_id: # Mate is mapped to another reference sequence
+            return None
+        self_reference_start:int = self.reference_start
+        mate_reference_start:int = self.wrapped.next_reference_start
+        return tuple(sorted([self_reference_start, mate_reference_start]))
+
 
 @dataclass
 class _LinkedSegment:
@@ -724,6 +734,34 @@ class SequenceAlignment:
             y = max(offsets) + 2
         return list(offsets)
 
+    @staticmethod
+    def _get_link_identifiers(segments: Sequence[AlignedSegment], link_by) -> Sequence[LinkIdentifier]:
+        links: Sequence[LinkIdentifier] = []
+        if link_by is None:
+            links = list(range(n_segments))  # Do not link segments together
+        elif isinstance(link_by, str):
+            if link_by == "pair":
+                links = []
+                link_id: tuple[int, int]
+                for i, segment in enumerate(segments):
+                    pair_id = segment._pair_identifier
+                    if pair_id is None:
+                        link_id = (-i-1, -i-1) # Arbitrary id to make sure non-paired reads are not linked together
+                    else:
+                        link_id = pair_id
+                    links.append(link_id)
+            elif link_by == "name":
+                links = [seg.query_name for seg in segments]
+            else:
+                raise ValueError()
+        elif isinstance(link_by, Iterable):
+            links = list(link_by)
+            if len(links) != n_segments:
+                raise ValueError()
+        elif callable(link_by):
+            links = [link_by(seg) for seg in segments]
+        return links
+
     def _parse_segment_parameters(
         self,
         *,
@@ -803,7 +841,15 @@ class SequenceAlignment:
             links = list(range(n_segments))  # Do not link segments together
         elif isinstance(link_by, str):
             if link_by == "pair":
-                links = list(range(n_segments))  # TODO
+                links = []
+                link_id: tuple[int, int]
+                for i, segment in enumerate(segments):
+                    pair_id = segment._pair_identifier
+                    if pair_id is None:
+                        link_id = (-i-1, -i-1) # Arbitrary id to make sure non-paired reads are not linked together
+                    else:
+                        link_id = pair_id
+                    links.append(link_id)
             elif link_by == "name":
                 links = [seg.query_name for seg in segments]
             else:
