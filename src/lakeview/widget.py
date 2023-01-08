@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from typing import Optional, Sequence, Literal, cast
+from dataclasses import dataclass
 from math import log10, ceil
 from warnings import warn
 import matplotlib as mpl
@@ -14,43 +15,12 @@ from ._type_alias import Figure, Axes
 from .plot import BasePairFormatter
 
 
-class GenomeViewer:
-    """
-    An interactive widget for viewing genomic data in Jupyter Notebooks.
-    """
+class _GenomeViewerWidget:
+    def __init__(self, figure: Figure, axes: Sequence[Axes]):
+        self.figure: Figure = figure
+        self.axes: Axes = axes
+        self._initial_xlim: tuple[float, float] = self.get_xlim()
 
-    def __init__(
-        self,
-        tracks: int = 1,
-        *,
-        height_ratios: Optional[Sequence[float]] = None,
-        figsize: tuple[float, float] = (10, 10),
-    ) -> None:
-        with plt.ioff():
-            fig, axes = plt.subplots(
-                nrows=tracks,
-                ncols=1,
-                figsize=figsize,
-                sharex=True,
-                sharey=False,
-                squeeze=False,
-                gridspec_kw=dict(height_ratios=height_ratios),
-                constrained_layout=True,
-            )
-        self._figure = fig
-        self._axes = axes[:, 0]
-        self._app: ipywidgets.AppLayout | None = None
-        self._initial_xlim: Optional[tuple[float, float]] = None
-
-    @property
-    def figure(self) -> Figure:
-        return self._figure
-
-    @property
-    def axes(self) -> Sequence[Axes]:
-        return self._axes
-
-    def _init_app(self) -> None:
         center_widget = ipywidgets.Output()
 
         zoom_in_button = ipywidgets.Button(description="Zoom in")
@@ -91,40 +61,25 @@ class GenomeViewer:
         )
         self._center_widget = center_widget
         self._footer_widget = footer_widget
-        # self.update_display()
+
         self._app = ipywidgets.AppLayout(
             center=center_widget, footer=footer_widget, pane_heights=[0, 1, "100px"]
         )
 
     @property
     def app(self) -> ipywidgets.AppLayout:
-        if self._app is None:
-            self._init_app()
         return self._app
-
-    @property
-    def xaxis(self) -> mpl.axis.XAxis:
-        return self.axes[-1].xaxis
-
-    def set_xlim(self, *args, **kw) -> tuple[float, float]:
-        return self.axes[0].set_xlim(*args, **kw)
-
-    def get_xlim(self) -> tuple[float, float]:
-        return self.axes[0].get_xlim()
-
-    def set_xlabel(self, *args, **kw) -> mpl.text.Text:
-        self.axes[-1].set_xlabel(*args, **kw)
-
-    def set_title(self, *args, **kw) -> mpl.text.Text:
-        self.axes[0].set_title(*args, **kw)
-
-    def savefig(self, *args, **kw) -> None:
-        self.figure.savefig(*args, **kw)
 
     def _ipython_display_(self) -> None:
         self._initial_xlim = self.get_xlim()
         self._update_display()
         display(self.app)
+
+    def get_xlim(self) -> tuple[float, float]:
+        return self.axes[0].get_xlim()
+
+    def set_xlim(self, *args, **kw) -> tuple[float, float]:
+        return self.axes[0].set_xlim(*args, **kw)
 
     def _zoom(self, scale, /):
         for ax in self.figure.axes:
@@ -159,9 +114,7 @@ class GenomeViewer:
             raise ValueError(f"Invalid region {region!r}")
 
     def _reset_xlim(self) -> None:
-        initial_xlim = self._initial_xlim
-        if initial_xlim is not None:
-            self.set_xlim(initial_xlim)
+        self.set_xlim(self._initial_xlim)
         self._update_display()
 
     def _update_xaxis_ticklabels(self) -> None:
@@ -180,7 +133,7 @@ class GenomeViewer:
             decimals,
             show_suffix=True,
         )
-        self.xaxis.set_major_formatter(formatter)
+        self.axes[-1].xaxis.set_major_formatter(formatter)
 
     def _update_region_text(self) -> None:
         start, end = self.get_xlim()
@@ -192,3 +145,68 @@ class GenomeViewer:
         self._center_widget.clear_output(wait=True)
         with self._center_widget:
             display(self.figure)
+
+
+
+class GenomeViewer:
+    """
+    An interactive widget for viewing genomic data in Jupyter Notebooks.
+    """
+    def __init__(
+        self,
+        tracks: int = 1,
+        *,
+        height_ratios: Optional[Sequence[float]] = None,
+        figsize: tuple[float, float] = (10, 10),
+    ) -> None:
+        with plt.ioff():
+            fig, axes = plt.subplots(
+                nrows=tracks,
+                ncols=1,
+                figsize=figsize,
+                sharex=True,
+                sharey=False,
+                squeeze=False,
+                gridspec_kw=dict(height_ratios=height_ratios),
+                constrained_layout=True,
+            )
+        self._figure = fig
+        self._axes = axes[:, 0]
+        self._widget: _GenomeViewerWidget | None = None
+
+    @property
+    def figure(self) -> Figure:
+        return self._figure
+
+    @property
+    def axes(self) -> Sequence[Axes]:
+        return self._axes
+
+    @property
+    def widget(self) -> _GenomeViewerWidget:
+        if self._widget is None:
+            widget = _GenomeViewerWidget(self.figure, self.axes)
+            self._widget = widget
+        return self._widget
+
+    @property
+    def xaxis(self) -> mpl.axis.XAxis:
+        return self.axes[-1].xaxis
+
+    def set_xlim(self, *args, **kw) -> tuple[float, float]:
+        return self.axes[0].set_xlim(*args, **kw)
+
+    def get_xlim(self) -> tuple[float, float]:
+        return self.axes[0].get_xlim()
+
+    def set_xlabel(self, *args, **kw) -> mpl.text.Text:
+        self.axes[-1].set_xlabel(*args, **kw)
+
+    def set_title(self, *args, **kw) -> mpl.text.Text:
+        self.axes[0].set_title(*args, **kw)
+
+    def savefig(self, *args, **kw) -> None:
+        self.figure.savefig(*args, **kw)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(figure={self.figure!r})"
