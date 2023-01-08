@@ -16,7 +16,10 @@
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "sh .devcontainer/post_create.sh",
 
-	"postStartCommand": "sh .devcontainer/post_start.sh"
+	"postStartCommand": "sh .devcontainer/post_start.sh",
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {}
+	}
 
 	// Configure tool-specific properties.
 	// "customizations": {},
