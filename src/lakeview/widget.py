@@ -119,20 +119,7 @@ class _GenomeViewerWidget:
 
     def _update_xaxis_ticklabels(self) -> None:
         start, end = self.get_xlim()
-        span = end - start
-        unit_divisor: int
-        for unit in ("Tb", "Gb", "Mb", "kb", "bp"):
-            unit_divisor = BasePairFormatter._get_unit_divisor(
-                cast(Literal["bp", "kb", "Mb", "Gb", "Tb"], unit)
-            )  # mypy does not infer a string as a literal unless assigned directly
-            if unit_divisor <= start:
-                break
-        decimals: int = max(0, 2 - ceil(log10(span / unit_divisor)))
-        formatter = BasePairFormatter(
-            cast(Literal["bp", "kb", "Mb", "Gb", "Tb"], unit),
-            decimals,
-            show_suffix=True,
-        )
+        formatter = GenomeViewer._get_xaxis_tick_formatter(start, end)
         self.axes[-1].xaxis.set_major_formatter(formatter)
 
     def _update_region_text(self) -> None:
@@ -147,11 +134,11 @@ class _GenomeViewerWidget:
             display(self.figure)
 
 
-
 class GenomeViewer:
     """
     An interactive widget for viewing genomic data in Jupyter Notebooks.
     """
+
     def __init__(
         self,
         tracks: int = 1,
@@ -194,10 +181,16 @@ class GenomeViewer:
         return self.axes[-1].xaxis
 
     def set_xlim(self, *args, **kw) -> tuple[float, float]:
-        return self.axes[0].set_xlim(*args, **kw)
+        start, end = self.axes[0].set_xlim(*args, **kw)
+        return start, end
 
     def get_xlim(self) -> tuple[float, float]:
         return self.axes[0].get_xlim()
+
+    def use_base_pair_formatter(self) -> None:
+        start, end = self.get_xlim()
+        formatter = self._get_xaxis_tick_formatter(start, end)
+        self.axes[-1].xaxis.set_major_formatter(formatter)
 
     def set_xlabel(self, *args, **kw) -> mpl.text.Text:
         self.axes[-1].set_xlabel(*args, **kw)
@@ -210,3 +203,29 @@ class GenomeViewer:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(figure={self.figure!r})"
+
+    @staticmethod
+    def _get_xaxis_tick_formatter(start: float, end: float) -> BasePairFormatter:
+        span = end - start
+        unit_divisor: int
+        for unit in ("Tb", "Gb", "Mb", "kb", "bp"):
+            unit_divisor = BasePairFormatter._get_unit_divisor(
+                cast(Literal["bp", "kb", "Mb", "Gb", "Tb"], unit)
+            )  # mypy does not infer a string as a literal unless assigned directly
+            if unit_divisor <= start:
+                break
+        decimals: int = max(0, 2 - ceil(log10(span / unit_divisor)))
+        formatter = BasePairFormatter(
+            cast(Literal["bp", "kb", "Mb", "Gb", "Tb"], unit),
+            decimals,
+            show_suffix=True,
+        )
+        return formatter
+
+    def clear(self) -> None:
+        """
+        Clear all contents in each Axes.
+        """
+        for ax in self.axes:
+            ax.cla()
+

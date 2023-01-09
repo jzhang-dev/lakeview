@@ -12,7 +12,8 @@ This is the documentation of Lakeview, which is currently under development and 
    :maxdepth: 2
    :caption: Contents:
 
-   usage/index
+   tutorials/index
+   gallery/index
    api/index
 
 

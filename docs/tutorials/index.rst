@@ -1,21 +1,16 @@
-Usage
+Tutorials
 ==================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   quick_start
    region
    custom_layout
-   test
-   HG002_IGH
-   SKBR3
+   genome_viewer
 
-   
 
-Execution statistics
---------------------
-.. nb-exec-table::
 
 
 
