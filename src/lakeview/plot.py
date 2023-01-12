@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex
 from ._type_alias import Color, Point, Axes
 
+# TODO: auto tick formatter  as a function
 
 def get_cmap_colors(
     cmap_name: str, format_: Literal["hex", "rgb"] = "hex"
@@ -161,3 +162,5 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
             raise ValueError(
                 f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNIT_DIVISOR_DICT)!r}."
             )
+
+

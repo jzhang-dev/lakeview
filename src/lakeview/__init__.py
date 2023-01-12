@@ -10,3 +10,4 @@ from . import alignment, annotation, plot, remote, sequence, widget
 SequenceAlignment = alignment.SequenceAlignment
 GeneAnnotation = annotation.GeneAnnotation
 GenomeViewer = widget.GenomeViewer
+DotPlot = sequence.DotPlot

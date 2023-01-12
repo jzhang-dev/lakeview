@@ -5,8 +5,8 @@ from __future__ import annotations
 import collections
 import math
 import itertools
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Literal, Sequence, Collection, Mapping
 import numpy as np
 from Bio import SeqIO
 
@@ -14,16 +14,43 @@ from . import util
 
 # This module is currently under development and delibrately left undocumented
 
+# Type aliases
+Kmer = str
+
+
+def load_multiple_sequences(
+    file_object,
+    sequence_names: Collection[str],
+    format_: Literal["fasta", "fastq"] = "fasta",
+) -> Mapping[str, str]:
+    sequence_dict: dict[str, str] = {}
+    sequences: list[str] = ["" for __ in sequence_names]
+    for record in SeqIO.parse(file_object, format=format_):
+        if record.id in sequence_names:
+            sequence_dict[record.id] = str(record.seq)
+    missing_names = [name for name in sequence_names if name not in sequence_dict]
+    if missing_names:
+        raise ValueError(f"Missing sequences: {missing_names!r}")
+    return sequence_dict
+
+
+def load_sequence(
+    file_object, sequence_name: str, format_: Literal["fasta", "fastq"] = "fasta"
+) -> str:
+    sequence_dict = load_multiple_sequences(
+        file_object, sequence_names=[sequence_name], format_=format_
+    )
+    return sequence_dict[sequence_name]
+
+
 Dot = collections.namedtuple("Dot", ["x", "y"])
 
 
-@dataclass(repr=False)
+@dataclass
 class DotPlot:
-    dots: list[Dot]
-    x_sequence_name: Optional[str] = None
-    y_sequence_name: Optional[str] = None
-    x_sequence_size: Optional[str] = None
-    y_sequence_size: Optional[str] = None
+    dots: Sequence[Dot] = field(repr=False)
+    x_sequence_size: int = field()
+    y_sequence_size: int = field()
 
     @classmethod
     def from_sequences(
@@ -33,11 +60,15 @@ class DotPlot:
         k=50,
         *,
         sample_fraction=1,
-        x_sequence_name=None,
-        y_sequence_name=None,
+        x_start=0,  # TODO
+        x_end=float("inf"),
+        y_start=0,
+        y_end=float("inf"),
     ):
-        if sample_fraction > 1:
-            raise ValueError("sample_fraction > 1")
+        if not (0 < sample_fraction <= 1):
+            raise ValueError(
+                f"Invalid value for `sample_fraction`: {sample_fraction!r}. Expecting `0 < sample_fraction <= 1`."
+            )
         elif sample_fraction == 1:
             kmer_sample_fraction = 1
         else:
@@ -57,72 +88,20 @@ class DotPlot:
                 dots.append(Dot(x, y))
 
         instance = cls(
-            dots,
-            x_sequence_name=x_sequence_name,
-            y_sequence_name=y_sequence_name,
-            x_sequence_size=len(x_sequence),
-            y_sequence_size=len(y_sequence),
+            dots, x_sequence_size=len(x_sequence), y_sequence_size=len(y_sequence)
         )
         return instance
 
-    @classmethod
-    def from_files(
-        cls,
-        x_file_path=None,
-        y_file_path=None,
-        k=50,
+    @staticmethod
+    def get_canonical_kmer_indices(
+        sequence: str,
+        k: int,
         *,
-        x_file_object=None,
-        y_file_object=None,
-        x_format="fasta",
-        y_format="fasta",
-        sample_fraction=1,
-        x_sequence_name=None,
-        y_sequence_name=None,
-    ):
-        x_name, x_sequence = cls.get_sequence(
-            x_file_path, x_file_object, format=x_format, sequence_name=x_sequence_name
-        )
-        y_name, y_sequence = cls.get_sequence(
-            y_file_path, y_file_object, format=y_format, sequence_name=y_sequence_name
-        )
-        return cls.from_sequences(
-            x_sequence,
-            y_sequence,
-            k=k,
-            sample_fraction=sample_fraction,
-            x_sequence_name=x_name,
-            y_sequence_name=y_name,
-        )
-
-    # TODO: Fix reading from the same handle twice
-    @staticmethod
-    def get_sequence(
-        file_path=None, file_object=None, format="fasta", sequence_name=None
-    ):
-        sequence = None
-        for i, record in enumerate(
-            SeqIO.parse(file_object or file_path, format=format)
-        ):
-            if sequence_name is None:
-                if i == 0:
-                    name = record.id
-                    sequence = str(record.seq)
-                else:
-                    raise ValueError(
-                        "Found multiple sequences. Please specify the `sequence_name`."
-                    )
-            else:
-                if record.id == sequence_name:
-                    name = sequence_name
-                    sequence = str(record.seq)
-                    break
-        if sequence is None:
-            raise ValueError(f"Sequence {sequence_name!r} not found.")
-        return name, sequence
-
-    @staticmethod
-    def get_canonical_kmer_indices(sequence, k, *, sample_fraction=1, seed=0):
+        sample_fraction: float = 1,
+        seed: int = 0,
+        start: int = 0,  # TODO
+        end: int = int(1e12),
+    ) -> Mapping[Kmer, Sequence[int]]:
         rng = np.random.default_rng(seed=seed)
         kmer_indices = collections.defaultdict(list)
         for index, kmer in util.enumerate_kmers(sequence, k, strand="single"):
@@ -140,39 +119,3 @@ class DotPlot:
         ax.scatter(xs, ys, s=s, edgecolor=edgecolor)
         ax.set_xlim(x_offset, x_offset + self.x_sequence_size - 1)
         ax.set_ylim(y_offset, y_offset + self.y_sequence_size - 1)
-        if self.x_sequence_name is not None:
-            ax.set_xlabel(self.x_sequence_name)
-        if self.y_sequence_name is not None:
-            ax.set_ylabel(self.y_sequence_name)
-
-    def draw_heatmap(
-        self,
-        ax,
-        *,
-        x_offset=0,
-        y_offset=0,
-        bin_size=1000,
-        density=True,
-        cmap="cividis",
-        cmin=1,
-        **kw,
-    ):
-        xs = np.array([dot.x for dot in self.dots]) + x_offset
-        ys = np.array([dot.y for dot in self.dots]) + y_offset
-        bins = [
-            np.arange(xs.min(), xs.max() + 1, bin_size),
-            np.arange(ys.min(), ys.max() + 1, bin_size),
-        ]
-        ax.hist2d(xs, ys, bins=bins, density=density, cmap=cmap, cmin=cmin, **kw)
-        ax.set_xlim(x_offset, x_offset + self.x_sequence_size - 1)
-        ax.set_ylim(y_offset, y_offset + self.y_sequence_size - 1)
-        if self.x_sequence_name is not None:
-            ax.set_xlabel(self.x_sequence_name)
-        if self.y_sequence_name is not None:
-            ax.set_ylabel(self.y_sequence_name)
-
-    def draw_self_dots(self, axis="x"):
-        pass
-
-    def draw_self_heatmap(self, axis="x"):
-        pass

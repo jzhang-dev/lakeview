@@ -36,9 +36,7 @@ def test_SKBR3():
     gv.axes[1].set_ylabel("Illumina")
     gv.axes[3].set_ylabel("PacBio")
     gv.set_xlabel("chr17")
-    gv.axes[-1].xaxis.set_major_formatter(
-        BasePairFormatter("Mb")
-    )
+    gv.axes[-1].xaxis.set_major_formatter(BasePairFormatter("Mb"))
     gv.set_title("SKBR3")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 200e3
@@ -99,9 +97,7 @@ def test_IGH():
 
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
         gencode_painter = lv.GeneAnnotation.from_gencode_gtf(
-            f,
-            'gtf',
-            region=(CHROMOSOME, (START, END))
+            f, "gtf", region=(CHROMOSOME, (START, END))
         )
     pacbio_painter = lv.SequenceAlignment.from_file(
         PACBIO_BAM_PATH, region=(CHROMOSOME, (START, END))
@@ -138,7 +134,7 @@ def test_GAPDH_RNAseq():
     alignment_painter = lv.SequenceAlignment.from_file(RNA_BAM_PATH, CHROMOSOME)
     with gzip.open(REFSEQ_GFF_PATH, "rt") as f:
         annotation_painter = lv.GeneAnnotation.from_refseq_gff(
-            f, 'gff3', region=('NC_000012.11', (START, END))
+            f, "gff3", region=("NC_000012.11", (START, END))
         )
 
     gv = lv.GenomeViewer(3, figsize=(8, 8), height_ratios=(1, 7, 2))
@@ -156,16 +152,14 @@ def test_GAPDH_RNAseq():
     annotation_painter.draw_transcripts(gv.axes[2])
     gv.set_xlim(6.643e6, 6.648e6)
     gv.set_xlabel(f"{CHROMOSOME}")
-    gv.axes[-1].xaxis.set_major_formatter(
-        BasePairFormatter("Mb")
-    )
+    gv.axes[-1].xaxis.set_major_formatter(BasePairFormatter("Mb"))
     gv.set_title(r"GM12878 $\it{GAPDH}$ RNAseq")
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 80e3
 
 
 def test_SNURF_methylation():
-    CHROMOSOME = 'chr15'
+    CHROMOSOME = "chr15"
     PACBIO_BAM_PATH = "tests/data/HG002_GRCh38_SNURF_haplotagged.bam"
     OUTPUT_PNG_PATH = "tests/output/SNURF_methylation.png"
     p = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, CHROMOSOME)
@@ -187,22 +181,24 @@ def test_SNURF_methylation():
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
 
 
-# def test_dot_plot():
-#     IGH_FASTA_PATH = "tests/data/IGH_reference_sequences.fasta.gz"
-#     OUTPUT_PNG_PATH = "tests/output/IGH_dot_plot.png"
+def test_dot_plot():
+    IGH_FASTA_PATH = "tests/data/IGH_reference_sequences.fasta.gz"
+    OUTPUT_PNG_PATH = "tests/output/IGH_dot_plot.png"
 
-#     with gzip.open(IGH_FASTA_PATH, "rt") as f1, gzip.open(IGH_FASTA_PATH, "rt") as f2:
-#         painter = lv.DotPlot.from_files(
-#             f1,
-#             f2,
-#             x_sequence_name="NC_000014.9:c106879844-105586437",
-#             y_sequence_name="NT_187600.1:c1351393-54793",
-#             sample_fraction=0.2,
-#         )
-#     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-#     painter.draw_dots(axes[0])
-#     painter.draw_heatmap(
-#         axes[1], bin_size=10e3, cmin=0
-#     )  # TODO: add a microsatellite region to demonstrate StainedGlass-style plot
-#     fig.savefig(OUTPUT_PNG_PATH, dpi=300)
-#     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
+    x_sequence_name = "NC_000014.9:c106879844-105586437"
+    y_sequence_name = "NT_187600.1:c1351393-54793"
+    with gzip.open(IGH_FASTA_PATH, "rt") as f1:
+        x_sequence = lv.sequence.load_sequence(f1, x_sequence_name)
+    with gzip.open(IGH_FASTA_PATH, "rt") as f2:
+        y_sequence = lv.sequence.load_sequence(f2, y_sequence_name)
+    painter = lv.DotPlot.from_sequences(
+        x_sequence, y_sequence, k=50, sample_fraction=0.2
+    )
+    fig, ax = plt.subplots(figsize=(6, 6))
+    painter.draw_dots(ax)
+    ax.set_xlabel(x_sequence_name)
+    ax.set_ylabel(y_sequence_name)
+
+    # TODO: add a microsatellite region to demonstrate StainedGlass-style plot
+    fig.savefig(OUTPUT_PNG_PATH, dpi=300)
+    assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
