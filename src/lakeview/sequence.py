@@ -25,10 +25,13 @@ def load_multiple_sequences(
 ) -> Mapping[str, str]:
     sequence_dict: dict[str, str] = {}
     sequences: list[str] = ["" for __ in sequence_names]
+    missing_names: list[str]
     for record in SeqIO.parse(file_object, format=format_):
         if record.id in sequence_names:
             sequence_dict[record.id] = str(record.seq)
-    missing_names = [name for name in sequence_names if name not in sequence_dict]
+            missing_names = [name for name in sequence_names if name not in sequence_dict]
+            if not missing_names:
+                break
     if missing_names:
         raise ValueError(f"Missing sequences: {missing_names!r}")
     return sequence_dict
