@@ -48,13 +48,15 @@ def key_filter(sequence: Sequence[T], keys: Sequence[bool]) -> Sequence[T]:
     return [element for element, key in zip(sequence, keys) if key]
     
 
-def pack_intervals(intervals: Iterable[tuple[float, float]]) -> Sequence[int]:
+def pack_intervals(intervals: Iterable[tuple[float, float]], max_offset:float=float('inf')) -> Sequence[int]:
     """
     Assign an non-negative offset to each input interval so that intervals sharing the same offset will not overlap with each other, while minimising offset values.
     Intervals are treated as being closed.
 
     >>> pack_intervals([(1, 2), (3, 4), (1, 3), (0, 5)])
     [0, 0, 1, 2]
+    >>> pack_intervals([(1, 2), (1, 2), (1, 2), (3, 4)], max_offset=1)
+    [0, 1, -1, 0]
     """
     occupied_intervals: list[list[tuple[float, float]]] = [[]]
     offsets = []
@@ -75,6 +77,11 @@ def pack_intervals(intervals: Iterable[tuple[float, float]]) -> Sequence[int]:
         else:
             # No places available.
             # Increment the offset.
+            new_offset = offset + 1
+            if new_offset > max_offset:
+                # Reached max offset; try next interval
+                offsets.append(-1) # -1 -> failed to pack within max offset
+                continue
             occupied_intervals.append([(start, end)])
             offsets.append(offset + 1)
     return offsets

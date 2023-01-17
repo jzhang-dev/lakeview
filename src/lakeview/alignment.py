@@ -688,6 +688,7 @@ class SequenceAlignment:
         link_identifiers: Sequence[LinkIdentifier],
         *,
         padding: float = 0,
+        max_offset: float=float('inf')
     ) -> np.ndarray:
         assert len(segments) == len(link_identifiers)
         # Link segments
@@ -698,7 +699,7 @@ class SequenceAlignment:
             intervals.append((ls.reference_start - padding, ls.reference_end + padding))
         link_offset_dict = {
             link: offset
-            for link, offset in zip(link_ls_dict, pack_intervals(intervals))
+            for link, offset in zip(link_ls_dict, pack_intervals(intervals, max_offset=max_offset))
         }
         # Retrive offset for each individual segment
         segment_offsets = np.array(
@@ -714,7 +715,7 @@ class SequenceAlignment:
         *,
         max_group_offset: float,
         min_spacing: float,
-    ) -> Sequence[int]:
+    ) -> Sequence[float]:
         # Check each LinkIdentifier only mpas to one GroupIdentifier.
         link_group_dict: dict[LinkIdentifier, GroupIdentifier] = {}
         for link, group in zip(link_identifiers, group_identifiers):
@@ -731,9 +732,9 @@ class SequenceAlignment:
             group_segments = [segments[i] for i in group_indices]
             group_links = [link_identifiers[i] for i in group_indices]
             group_offsets = SequenceAlignment._pack_segments(
-                group_segments, group_links, padding=min_spacing / 2
+                group_segments, group_links, padding=min_spacing / 2, max_offset=max_group_offset
             )
-            group_offsets[group_offsets > max_group_offset] = -np.inf
+            group_offsets[group_offsets < 0] = float('-inf')
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
         return list(offsets)
@@ -1526,7 +1527,7 @@ class SequenceAlignment:
         self,
         ax: Axes,
         segments: Sequence[AlignedSegment],
-        offsets: Sequence[int],
+        offsets: Sequence[float],
         link_identifiers: Sequence[LinkIdentifier],
         *,
         linewidth: float = 1.5,
@@ -1537,7 +1538,7 @@ class SequenceAlignment:
         link_ls_dict: dict[LinkIdentifier, _LinkedSegment] = self._link_segments(
             segments, link_identifiers
         )
-        link_offset_dict: dict[LinkIdentifier, int] = {}
+        link_offset_dict: dict[LinkIdentifier, float] = {}
         for link, y in zip(link_identifiers, offsets):
             if link in link_offset_dict:
                 if link_offset_dict[link] != y:
