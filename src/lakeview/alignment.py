@@ -688,7 +688,7 @@ class SequenceAlignment:
         link_identifiers: Sequence[LinkIdentifier],
         *,
         padding: float = 0,
-        max_offset: float=float('inf')
+        max_offset: float = float("inf"),
     ) -> np.ndarray:
         assert len(segments) == len(link_identifiers)
         # Link segments
@@ -699,7 +699,9 @@ class SequenceAlignment:
             intervals.append((ls.reference_start - padding, ls.reference_end + padding))
         link_offset_dict = {
             link: offset
-            for link, offset in zip(link_ls_dict, pack_intervals(intervals, max_offset=max_offset))
+            for link, offset in zip(
+                link_ls_dict, pack_intervals(intervals, max_offset=max_offset)
+            )
         }
         # Retrive offset for each individual segment
         segment_offsets = np.array(
@@ -732,9 +734,12 @@ class SequenceAlignment:
             group_segments = [segments[i] for i in group_indices]
             group_links = [link_identifiers[i] for i in group_indices]
             group_offsets = SequenceAlignment._pack_segments(
-                group_segments, group_links, padding=min_spacing / 2, max_offset=max_group_offset
+                group_segments,
+                group_links,
+                padding=min_spacing / 2,
+                max_offset=max_group_offset,
             )
-            group_offsets[group_offsets < 0] = float('-inf')
+            group_offsets[group_offsets < 0] = float("-inf")
             offsets[group_indices] = group_offsets + y
             y = max(offsets) + 2
         return list(offsets)
@@ -899,7 +904,6 @@ class SequenceAlignment:
             group_identifiers = [group_by(seg) for seg in segments]
         return group_identifiers
 
-
     def _get_default_segment_height(
         self, ax: Axes, offsets, *, min_height=2, max_height=10
     ) -> float:
@@ -947,6 +951,7 @@ class SequenceAlignment:
         max_rows: int = 200,
         min_spacing: Optional[float] = None,
         show_backbones: bool = True,
+        show_segment_markers: bool = True,
         show_arrowheads: bool = True,
         show_links: bool = True,
         show_insertions: bool = True,
@@ -963,6 +968,7 @@ class SequenceAlignment:
         show_group_labels: Optional[bool] = None,
         show_group_separators: bool = True,
         backbones_kw={},
+        segment_markers_kw={},
         arrowheads_kw={},
         links_kw={},
         insertions_kw={},
@@ -1004,7 +1010,7 @@ class SequenceAlignment:
         link_identifiers = self._get_link_identifiers(link_by)
         filter_keys = self._get_filter_keys(filter_by)
         sort_keys = self._get_sort_keys(sort_by)
-        
+
         # Filter segments
         if filter_by is not None:
             segments = key_filter(segments, filter_keys)
@@ -1015,7 +1021,7 @@ class SequenceAlignment:
                 sort_keys = key_filter(sort_keys, filter_keys)
             if not segments:
                 warnings.warn("No segment remains after filtering.")
-        
+
         # Sort segments
         if sort_by is not None:
             segments = key_sort(segments, sort_keys)
@@ -1078,6 +1084,15 @@ class SequenceAlignment:
                 height=height,
                 colors=colors,
                 **backbones_kw,
+            )
+        if show_segment_markers:
+            self._draw_segment_markers(
+                ax,
+                segments,
+                offsets,
+                height=height,
+                colors=colors,
+                **segment_markers_kw,
             )
         if show_arrowheads:
             self._draw_arrowheads(
@@ -1190,6 +1205,45 @@ class SequenceAlignment:
                 facecolors="none",
             )
         )
+
+    def _draw_segment_markers(
+        self,
+        ax: Axes,
+        segments: Sequence[AlignedSegment],
+        offsets: Sequence[float],
+        height: float,
+        *,
+        colors: Sequence[Color],
+        linewidth: float = 1,
+        **kw
+    ) -> None:
+        marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
+        xs: list[float] = [seg.reference_end - 0.5 for seg in segments]
+        ys: list[float] = list(offsets)
+        zorder = 0.05
+        if len(set(colors)) == 1:
+            ax.plot(
+                xs,
+                ys,
+                marker=marker,
+                markersize=height,
+                color=colors[0],
+                linestyle="",
+                markeredgewidth=linewidth,
+                zorder=zorder,
+                **kw
+            )
+        else:
+            ax.scatter(
+                xs,
+                ys,
+                c=colors,
+                marker=marker,
+                s=height**2,
+                linewidth=linewidth,
+                zorder=zorder,
+                **kw
+            )
 
     def _draw_arrowheads(
         self,
