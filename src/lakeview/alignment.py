@@ -951,7 +951,6 @@ class SequenceAlignment:
         max_rows: int = 200,
         min_spacing: Optional[float] = None,
         show_backbones: bool = True,
-        show_segment_markers: bool = True,
         show_arrowheads: bool = True,
         show_links: bool = True,
         show_insertions: bool = True,
@@ -968,7 +967,6 @@ class SequenceAlignment:
         show_group_labels: Optional[bool] = None,
         show_group_separators: bool = True,
         backbones_kw={},
-        segment_markers_kw={},
         arrowheads_kw={},
         links_kw={},
         insertions_kw={},
@@ -1085,15 +1083,6 @@ class SequenceAlignment:
                 colors=colors,
                 **backbones_kw,
             )
-        if show_segment_markers:
-            self._draw_segment_markers(
-                ax,
-                segments,
-                offsets,
-                height=height,
-                colors=colors,
-                **segment_markers_kw,
-            )
         if show_arrowheads:
             self._draw_arrowheads(
                 ax,
@@ -1186,16 +1175,23 @@ class SequenceAlignment:
         height: float,
         *,
         colors: Sequence[Color],
+        markeredgewidth=1,
         **kw,
     ) -> None:
+        MARKER = Path([(0, 0.5), (0, -0.5)], readonly=True)
         lines: list[tuple[Point, Point]] = []
         line_colors: list[Color] = []
+        marker_xs : list[float] = []
+        marker_ys: list[float] = []
+        marker_colors: list[Color] = []
         for seg, y, color in zip(segments, offsets, colors):
             for block_start, block_end in seg._get_normalized_blocks():
                 start_point = (block_start - 0.5, y)
                 end_point = (block_end - 0.5, y)
                 lines.append((start_point, end_point))
                 line_colors.append(color)
+                marker_xs.append((block_start + block_end) / 2 - 0.5)
+                marker_ys.append(y)
         ax.add_collection(
             LineCollection(
                 lines,
@@ -1205,45 +1201,27 @@ class SequenceAlignment:
                 facecolors="none",
             )
         )
-
-    def _draw_segment_markers(
-        self,
-        ax: Axes,
-        segments: Sequence[AlignedSegment],
-        offsets: Sequence[float],
-        height: float,
-        *,
-        colors: Sequence[Color],
-        linewidth: float = 1,
-        **kw,
-    ) -> None:
-        marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
-        xs: list[float] = [
-            (seg.reference_start + seg.reference_end) / 2 - 0.5 for seg in segments
-        ]
-        ys: list[float] = list(offsets)
-        zorder = 0.05
-        if len(set(colors)) == 1:
+        MARKER_ZORDER = 0.05
+        if len(set(marker_colors)) == 1:
             ax.plot(
-                xs,
-                ys,
-                marker=marker,
+                marker_xs,
+                marker_ys,
+                marker=MARKER,
                 markersize=height,
-                color=colors[0],
+                color=marker_colors[0],
                 linestyle="",
-                markeredgewidth=linewidth,
-                zorder=zorder,
-                **kw,
+                markeredgewidth=markeredgewidth,
+                zorder=MARKER_ZORDER,
             )
         else:
             ax.scatter(
-                xs,
-                ys,
-                c=colors,
-                marker=marker,
+                marker_xs,
+                marker_ys,
+                c=marker_colors,
+                marker=MARKER,
                 s=height**2,
-                linewidth=linewidth,
-                zorder=zorder,
+                linewidth=markeredgewidth,
+                zorder=MARKER_ZORDER,
                 **kw,
             )
 
