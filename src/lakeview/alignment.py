@@ -1215,10 +1215,12 @@ class SequenceAlignment:
         *,
         colors: Sequence[Color],
         linewidth: float = 1,
-        **kw
+        **kw,
     ) -> None:
         marker = Path([(0, 0.5), (0, -0.5)], readonly=True)
-        xs: list[float] = [seg.reference_end - 0.5 for seg in segments]
+        xs: list[float] = [
+            (seg.reference_start + seg.reference_end) / 2 - 0.5 for seg in segments
+        ]
         ys: list[float] = list(offsets)
         zorder = 0.05
         if len(set(colors)) == 1:
@@ -1231,7 +1233,7 @@ class SequenceAlignment:
                 linestyle="",
                 markeredgewidth=linewidth,
                 zorder=zorder,
-                **kw
+                **kw,
             )
         else:
             ax.scatter(
@@ -1242,7 +1244,7 @@ class SequenceAlignment:
                 s=height**2,
                 linewidth=linewidth,
                 zorder=zorder,
-                **kw
+                **kw,
             )
 
     def _draw_arrowheads(
@@ -1319,10 +1321,6 @@ class SequenceAlignment:
         )  # Optimally, when zoomed-in at single-base level, the mismatche marker should extend to 1-base width. For simplicity, this is not currently supported.
 
         for seg, y in zip(segments, offsets):
-            if seg.mismatched_bases is None:
-                raise RuntimeError(
-                    "Failed to obtain mismatched bases using CIGAR string or the MD tag. Please provide the reference sequence or use `show_mismatched_bases=False`."
-                )
             for mb in seg.mismatched_bases:
                 xs_dict[mb.query_base].append(mb.reference_position)
                 ys_dict[mb.query_base].append(y)
