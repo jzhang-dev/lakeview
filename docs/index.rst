@@ -8,6 +8,18 @@ Welcome to Lakeview's documentation!
 
 This is the documentation of Lakeview, which is currently under development and will be released by summer 2023. 
 
+Lakeview is a Python 3 library for creating publication-quality [IGV](https://software.broadinstitute.org/software/igv/)-style genomic visualizations. Lakeview is based on [Matplotlib](https://matplotlib.org/). 
+
+
+Features
+------------
+
+- **Improved clarity**. Lakeview inherits the familiar and intuitive visual style of [IGV](https://software.broadinstitute.org/software/igv/), with a clear layout designed for publication and presentation. 
+- **Programmable plotting**. Multiple files and genomic regions can be visualized automatically through a Pythonic interface inspired by [Seaborn](https://seaborn.pydata.org/) and [Pandas](https://pandas.pydata.org/).
+- **Support for remote data**. Genomic data are often stored in remote servers without display devices. With Lakeview, you can plot remotely and view the output figures locally. Lakeview works well with [JupyterLab](https://jupyterlab.readthedocs.io/en/stable/) to streamline this workflow. 
+- **Transparency and reproduciblity**. Figures are plotted transparently and annotated explicitly. The input data and the plotting code contain all the information needed to reproduce the figure. 
+- **Customizable layouts**. Lakeview supports many layouts implemented in [IGV](https://software.broadinstitute.org/software/igv/), while allowing the user to define custom rules for ordering, groupping, and coloring each segment. Advanced customization is possible via the [Matplotlib](https://matplotlib.org/) API.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
