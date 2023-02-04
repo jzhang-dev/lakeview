@@ -6,8 +6,10 @@ from typing import Optional, Union, Callable, Literal, TextIO, TypeVar
 from collections.abc import Iterable, Sequence, Mapping, Container
 from dataclasses import dataclass, field, asdict
 import warnings
+from math import floor
 import numpy as np
 from matplotlib.collections import LineCollection
+from matplotlib.path import Path
 from ._region_notation import (
     parse_region_notation,
     normalize_region_notation,
@@ -16,6 +18,7 @@ from ._region_notation import (
 from .plot import get_ax_size
 from ._layout import key_filter, key_sort, pack_intervals
 from ._type_alias import GroupIdentifier, Color, Axes, Identifier
+
 
 @dataclass
 class AnnotationRecord:
@@ -138,7 +141,7 @@ class GeneAnnotation:
                 trim_prefix=0,
                 trim_suffix=1,
             )
-        elif format_ == 'gff3':
+        elif format_ == "gff3":
             attr_kw = dict(
                 field_separator=";",
                 key_value_separator="=",
@@ -148,7 +151,9 @@ class GeneAnnotation:
                 trim_suffix=0,
             )
         else:
-            raise ValueError(f"Invalid value for `format_`: {format!r}. Expecting one of ('gtf', 'gff3').")
+            raise ValueError(
+                f"Invalid value for `format_`: {format!r}. Expecting one of ('gtf', 'gff3')."
+            )
 
         records: list[AnnotationRecord] = []
         for line in file_object:
@@ -226,19 +231,19 @@ class GeneAnnotation:
         if not records:
             warnings.warn("No annotation records have been loaded.")
         # Parse gene_key and transcript_key
-        transcript_key: str # Fetch the transcript_id from a transcript record
-        parent_transcript_key: str # Fetch the parent transcript_id from a exon/CDS record
-        gene_key: str # Fetch the gene_id from a gene record. Reserved for future use
-        parent_gene_key: str # Fetch the parent gene_id from a transcript record
-        if format_ == 'gtf':
+        transcript_key: str  # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str  # Fetch the parent transcript_id from a exon/CDS record
+        gene_key: str  # Fetch the gene_id from a gene record. Reserved for future use
+        parent_gene_key: str  # Fetch the parent gene_id from a transcript record
+        if format_ == "gtf":
             transcript_key = "transcript_id"
             parent_transcript_key = "transcript_id"
             # gene_key = "gene_id"
             # parent_gene_key = "gene_id"
-        elif format_ == 'gff3':
+        elif format_ == "gff3":
             transcript_key = "ID"
             parent_transcript_key = "Parent"
-            # gene_key = "ID" 
+            # gene_key = "ID"
             # parent_gene_key = "Parent"
         # Identify genes, transcripts, exons, cdss
         genes, transcripts, exons, cdss = [], [], [], []
@@ -304,13 +309,13 @@ class GeneAnnotation:
             region=region,
             format_=format_,
             gene_features=[
-            "gene",
-            "C_gene_segment",
-            "D_gene_segment",
-            "J_gene_segment",
-            "V_gene_segment",
-            "pseudogene",
-        ],
+                "gene",
+                "C_gene_segment",
+                "D_gene_segment",
+                "J_gene_segment",
+                "V_gene_segment",
+                "pseudogene",
+            ],
             transcript_features=["transcript", "mRNA"],
             exon_features=["exon"],
             cds_features=["CDS"],
@@ -364,7 +369,7 @@ class GeneAnnotation:
         gene_height=None,
         show_labels=True,
         labels_kw={},
-    ): 
+    ):
         genes = self.genes
         intervals = [(g.start, g.end) for g in genes]
         offsets: Sequence[int]
@@ -407,7 +412,9 @@ class GeneAnnotation:
         return np.array(pack_intervals(intervals), dtype=np.float32)
 
     @staticmethod
-    def _get_transcript_offsets(transcripts, groups, *, max_group_offset) -> Sequence[int]:
+    def _get_transcript_offsets(
+        transcripts, groups, *, max_group_offset
+    ) -> Sequence[int]:
         offsets = np.zeros(len(transcripts))
         y = 0
         for group in list(sorted(set(groups))):
@@ -427,7 +434,12 @@ class GeneAnnotation:
         filter_by,
         color_by,
         label_by,
-    ) -> tuple[Sequence[TranscriptRecord], Sequence[GroupIdentifier], Sequence[Color], Sequence[str]]:
+    ) -> tuple[
+        Sequence[TranscriptRecord],
+        Sequence[GroupIdentifier],
+        Sequence[Color],
+        Sequence[str],
+    ]:
         transcripts: Sequence[TranscriptRecord] = self.transcripts
         n_transcripts = len(transcripts)
         # Groups
@@ -442,7 +454,7 @@ class GeneAnnotation:
         # Colors
         colors: Sequence[Color] = []
         if color_by is None:
-            colors = ["b"] * n_transcripts
+            colors = [(0, 0, 178/255)] * n_transcripts
         elif callable(color_by):
             colors = [color_by(t) for t in transcripts]
         elif isinstance(color_by, Iterable):
@@ -490,8 +502,6 @@ class GeneAnnotation:
             sort_keys = [sort_by(t) for t in transcripts]
         elif isinstance(sort_by, Iterable):
             sort_keys = list(sort_by)
-        
-
 
         if filter_by is not None:
             transcripts = key_filter(transcripts, filter_keys)
@@ -545,16 +555,18 @@ class GeneAnnotation:
             Callable[[GroupIdentifier], str], Mapping[GroupIdentifier, str], None
         ] = None,
         height: Optional[float] = None,
-        max_rows: int=100,
+        max_rows: int = 100,
+        draw_arrows: bool = True,
         transcripts_kw={},
+        arrows_kw={},
         exons_kw={},
         cdss_kw={},
         labels_kw={},
-    ):  
+    ):
         """
         Draw sequence alignment patterns, in a style similar to `IGH feature track <https://software.broadinstitute.org/software/igv/feature_track_options>`_.
 
-        :param max_rows: The maximum number of rows to layout transcripts. Excess transcripts will not be drawn. If multiple transcript groups exist, this parameter limits the maximum number of rows *per group*. 
+        :param max_rows: The maximum number of rows to layout transcripts. Excess transcripts will not be drawn. If multiple transcript groups exist, this parameter limits the maximum number of rows *per group*.
         """
         transcripts, groups, colors, labels = self._parse_transcript_parameters(
             sort_by=sort_by,
@@ -596,6 +608,10 @@ class GeneAnnotation:
         self._draw_transcript_backbones(
             ax, transcripts, offsets, colors=colors, **transcripts_kw
         )
+        if draw_arrows:
+            self._draw_arrows(
+                ax, transcripts, offsets, height=height * 0.5, colors=colors, **arrows_kw
+            )
 
         offset_dict = {t.transcript_id: y for t, y in zip(transcripts, offsets)}
         exons = [x for x in self.exons if x.transcript_id in offset_dict]
@@ -620,7 +636,7 @@ class GeneAnnotation:
                 ax, transcripts, labels, offsets, colors=colors, **labels_kw
             )
 
-    def _draw_transcript_backbones(self, ax, transcripts, offsets, height=1, *, colors):
+    def _draw_transcript_backbones(self, ax, transcripts, offsets, colors, *, height=1, **kw):
         lines = [((t.start, y), (t.end, y)) for t, y in zip(transcripts, offsets)]
         ax.add_collection(
             LineCollection(
@@ -632,26 +648,75 @@ class GeneAnnotation:
             )
         )
 
-    def _draw_exons(self, ax, exons, offsets, height, *, colors, **kw):
+    def _draw_exons(self, ax, exons, offsets, height, colors, **kw):
         lines = [((x.start, y), (x.end, y)) for x, y in zip(exons, offsets)]
         ax.add_collection(
             LineCollection(
                 lines,
                 linewidths=height,
                 colors=colors[0] if len(set(colors)) == 1 else colors,
-                zorder=0,
+                zorder=0.1,
                 facecolors="none",
             )
         )
 
-    def _draw_cdss(self, ax, cdss, offsets, height, *, colors, **kw):
+    def _draw_cdss(self, ax, cdss, offsets, height, colors, **kw):
         lines = [((x.start, y), (x.end, y)) for x, y in zip(cdss, offsets)]
         ax.add_collection(
             LineCollection(
                 lines,
                 linewidths=height,
                 colors=colors[0] if len(set(colors)) == 1 else colors,
-                zorder=0,
+                zorder=0.2,
                 facecolors="none",
             )
         )
+
+    def _draw_arrows(
+        self,
+        ax: Axes,
+        transcripts: Sequence[TranscriptRecord],
+        offsets: Sequence[float],
+        height: float,
+        colors: Sequence[Color],
+        *,
+        min_spacing: float = 100,
+        linewidth=0.5,
+        **kw,
+    ) -> None:
+        markers = {
+            "+": Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True),
+            "-": Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True),
+        }
+        xs: dict[str, list[float]] = {"+": [], "-": []}
+        ys: dict[str, list[float]] = {"+": [], "-": []}
+        cs: dict[str, list[Color]] = {"+": [], "-": []}
+
+        for transcript, y, color in zip(transcripts, offsets, colors):
+            if transcript.strand is None:
+                continue
+            n_marker = max(floor((transcript.end - transcript.start) / min_spacing), 1)
+            marker_positions: list[float]
+            if n_marker == 1:
+                marker_positions = [(transcript.end + transcript.start) / 2]
+            else:
+                spacing: float = (transcript.end - transcript.start) / n_marker
+                marker_positions = [
+                    transcript.start + (i + 0.5) * spacing for i in range(n_marker)
+                ]
+
+            xs[transcript.strand] += marker_positions
+            ys[transcript.strand] += [y] * n_marker
+            cs[transcript.strand] += [color] * n_marker
+
+        for strand in ("+", "-"):
+            ax.scatter(
+                    xs[strand],
+                    ys[strand],
+                    s=height**2,
+                    c=cs[strand],
+                    marker=markers[strand],
+                    linewidths=linewidth,
+                    zorder=0.5,
+                    **kw,
+                )

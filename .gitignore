@@ -133,3 +133,6 @@ dmypy.json
 
 # Data
 # **/data/**
+
+# Sandbox
+sandbox/
