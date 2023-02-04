@@ -680,7 +680,7 @@ class GeneAnnotation:
         height: float,
         colors: Sequence[Color],
         *,
-        min_spacing: float = 100,
+        min_spacing: float = 200,
         linewidth=0.5,
         **kw,
     ) -> None:
