@@ -454,7 +454,7 @@ class GeneAnnotation:
         # Colors
         colors: Sequence[Color] = []
         if color_by is None:
-            colors = [(0, 0, 178/255)] * n_transcripts
+            colors = [(0, 0, 178 / 255)] * n_transcripts
         elif callable(color_by):
             colors = [color_by(t) for t in transcripts]
         elif isinstance(color_by, Iterable):
@@ -610,7 +610,12 @@ class GeneAnnotation:
         )
         if draw_arrows:
             self._draw_arrows(
-                ax, transcripts, offsets, height=height * 0.5, colors=colors, **arrows_kw
+                ax,
+                transcripts,
+                offsets,
+                height=height,
+                colors=colors,
+                **arrows_kw,
             )
 
         offset_dict = {t.transcript_id: y for t, y in zip(transcripts, offsets)}
@@ -623,7 +628,7 @@ class GeneAnnotation:
         cds_colors = [color_dict[x.transcript_id] for x in cdss]
 
         self._draw_exons(
-            ax, exons, exon_offsets, height=height / 2, colors=exon_colors, **exons_kw
+            ax, exons, exon_offsets, height=height, colors=exon_colors, **exons_kw
         )
         self._draw_cdss(
             ax, cdss, cds_offsets, height=height, colors=cds_colors, **cdss_kw
@@ -636,7 +641,9 @@ class GeneAnnotation:
                 ax, transcripts, labels, offsets, colors=colors, **labels_kw
             )
 
-    def _draw_transcript_backbones(self, ax, transcripts, offsets, colors, *, height=1, **kw):
+    def _draw_transcript_backbones(
+        self, ax, transcripts, offsets, colors, *, height=1, **kw
+    ):
         lines = [((t.start, y), (t.end, y)) for t, y in zip(transcripts, offsets)]
         ax.add_collection(
             LineCollection(
@@ -649,11 +656,12 @@ class GeneAnnotation:
         )
 
     def _draw_exons(self, ax, exons, offsets, height, colors, **kw):
+        line_width = height * 0.5
         lines = [((x.start, y), (x.end, y)) for x, y in zip(exons, offsets)]
         ax.add_collection(
             LineCollection(
                 lines,
-                linewidths=height,
+                linewidths=line_width,
                 colors=colors[0] if len(set(colors)) == 1 else colors,
                 zorder=0.1,
                 facecolors="none",
@@ -661,11 +669,12 @@ class GeneAnnotation:
         )
 
     def _draw_cdss(self, ax, cdss, offsets, height, colors, **kw):
+        line_width = height
         lines = [((x.start, y), (x.end, y)) for x, y in zip(cdss, offsets)]
         ax.add_collection(
             LineCollection(
                 lines,
-                linewidths=height,
+                linewidths=line_width,
                 colors=colors[0] if len(set(colors)) == 1 else colors,
                 zorder=0.2,
                 facecolors="none",
@@ -680,10 +689,29 @@ class GeneAnnotation:
         height: float,
         colors: Sequence[Color],
         *,
-        min_spacing: float = 200,
-        linewidth=0.5,
+        style: Literal["single", "fishbone"] = "single",
         **kw,
     ) -> None:
+        if style == "single":
+            self._draw_single_arrows(ax, transcripts, offsets, height, colors, **kw)
+        elif style == "fishbone":
+            self._draw_fishbone_arrows(ax, transcripts, offsets, height, colors, **kw)
+        else:
+            raise ValueError()
+
+    def _draw_fishbone_arrows(
+        self,
+        ax: Axes,
+        transcripts: Sequence[TranscriptRecord],
+        offsets: Sequence[float],
+        height: float,
+        colors: Sequence[Color],
+        *,
+        min_spacing: float = 200,
+        linewidth: float = 0.5,
+        **kw,
+    ) -> None:
+        marker_size = height * 0.5
         markers = {
             "+": Path([(0, 0.5), (0.5, 0), (0, -0.5)], readonly=True),
             "-": Path([(0, 0.5), (-0.5, 0), (0, -0.5)], readonly=True),
@@ -711,12 +739,95 @@ class GeneAnnotation:
 
         for strand in ("+", "-"):
             ax.scatter(
-                    xs[strand],
-                    ys[strand],
-                    s=height**2,
-                    c=cs[strand],
-                    marker=markers[strand],
-                    linewidths=linewidth,
-                    zorder=0.5,
-                    **kw,
-                )
+                xs[strand],
+                ys[strand],
+                s=marker_size**2,
+                c=cs[strand],
+                marker=markers[strand],
+                linewidths=linewidth,
+                zorder=0.5,
+                **kw,
+            )
+
+    def _draw_single_arrows(
+        self,
+        ax: Axes,
+        transcripts: Sequence[TranscriptRecord],
+        offsets: Sequence[float],
+        height: float,
+        colors: Sequence[Color],
+        *,
+        linewidth: float = 0.5,
+        **kw,
+    ) -> None:
+        arrow_size = 0.3
+        marker_size = height * 2
+        fwd_marker = Path(
+            [
+                (0, 0),
+                (0, 1),
+                (1, 1),
+                (1 - arrow_size, 1 - arrow_size),
+                (1 - arrow_size, 1 + arrow_size),
+                (1, 1),
+            ],
+            [
+                Path.MOVETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.MOVETO,
+                Path.LINETO,
+            ],
+        )
+        rev_marker = Path(
+            [
+                (0, 0),
+                (0, -1),
+                (-1, -1),
+                (-1 + arrow_size, -1 - arrow_size),
+                (-1 + arrow_size, -1 + arrow_size),
+                (-1, -1),
+            ],
+            [
+                Path.MOVETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.MOVETO,
+                Path.LINETO,
+            ],
+        )
+        markers = {
+            "+": fwd_marker,
+            "-": rev_marker,
+        }
+        xs: dict[str, list[float]] = {"+": [], "-": []}
+        ys: dict[str, list[float]] = {"+": [], "-": []}
+        cs: dict[str, list[Color]] = {"+": [], "-": []}
+
+        for transcript, y, color in zip(transcripts, offsets, colors):
+            if transcript.strand is None:
+                continue
+            elif transcript.strand == "+":
+                marker_position = transcript.start
+            elif transcript.strand == "-":
+                marker_position = transcript.end
+            else:
+                raise ValueError()
+            xs[transcript.strand].append(marker_position)
+            ys[transcript.strand].append(y)
+            cs[transcript.strand].append(color)
+
+        for strand in ("+", "-"):
+            ax.scatter(
+                xs[strand],
+                ys[strand],
+                s=marker_size**2,
+                edgecolors=cs[strand],
+                facecolors="none",
+                marker=markers[strand],
+                linewidths=linewidth,
+                zorder=0.5,
+                **kw,
+            )

@@ -15,7 +15,7 @@ def test_SKBR3():
     CHROMOSOME = "17"
     ILLUMINA_BAM_PATH = "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam"
     PACBIO_BAM_PATH = "tests/data/SKBR3_PacBio.bam"
-    OUTPUT_PNG_PATH = "tests/output/SKBR3_Illumina_PacBio.png"
+    
     illumina_painter = lv.SequenceAlignment.from_file(
         ILLUMINA_BAM_PATH, region=CHROMOSOME
     )
@@ -38,6 +38,8 @@ def test_SKBR3():
     gv.set_xlabel("chr17")
     gv.axes[-1].xaxis.set_major_formatter(BasePairFormatter("Mb"))
     gv.set_title("SKBR3")
+    
+    OUTPUT_PNG_PATH = "tests/output/SKBR3_Illumina_PacBio.png"
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 200e3
 
@@ -115,7 +117,7 @@ def test_IGH():
         link_by="name",
         max_rows=50,
     )
-    gencode_painter.draw_transcripts(gv.axes[2], max_rows=5, sort_by="length")
+    gencode_painter.draw_transcripts(gv.axes[2], max_rows=5, sort_by="length", arrows_kw=dict(style="single"))
 
     gv.set_xlim((105679000, 105776000))
     gv.set_xlabel(CHROMOSOME)
@@ -149,7 +151,7 @@ def test_GAPDH_RNAseq():
         show_group_labels=False,
         show_group_separators=False,
     )
-    annotation_painter.draw_transcripts(gv.axes[2])
+    annotation_painter.draw_transcripts(gv.axes[2], arrows_kw=dict(style="fishbone"))
     gv.set_xlim(6.643e6, 6.648e6)
     gv.set_xlabel(f"{CHROMOSOME}")
     gv.axes[-1].xaxis.set_major_formatter(BasePairFormatter("Mb"))
