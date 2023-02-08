@@ -1,5 +1,6 @@
 {
     "@jupyterlab/apputils-extension:themes": {
+        "theme": "JupyterLab Dark",
         "theme-scrollbars": true
     },
     "@jupyterlab/application-extension:sidebar": {
