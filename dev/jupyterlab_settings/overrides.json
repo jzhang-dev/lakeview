@@ -1,6 +1,5 @@
 {
     "@jupyterlab/apputils-extension:themes": {
-        "theme": "JupyterLab Horizon",
         "theme-scrollbars": true
     },
     "@jupyterlab/application-extension:sidebar": {
@@ -26,31 +25,5 @@
     },
     "@jupyterlab/codemirror-extension:commands": {
         "styleActiveLine": true
-    },
-    "@ryantam626/jupyterlab_code_formatter:settings": {
-        "preferences": {
-            "default_formatter": {
-                "python": [
-                    "black"
-                ]
-            }
-        },
-        "black": {
-            "line_length": 88,
-            "string_normalization": true
-        },
-        "formatOnSave": false,
-        "suppressFormatterErrors": false
-    },
-    "@jupyterlab/shortcuts-extension:shortcuts": {
-        "shortcuts": [
-            {
-                "command": "jupyterlab_code_formatter:format",
-                "keys": [
-                    "Accel Shift F"
-                ],
-                "selector": ".jp-Notebook.jp-mod-editMode"
-            }
-        ]
     }
 }
