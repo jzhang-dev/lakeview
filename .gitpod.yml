@@ -4,13 +4,9 @@ image:
 tasks:
   - name: Install development dependencies
     init: |
+      pip install -ve . &&
       pip install -v -r dev/requirements.txt &&
       gp sync-done dev_dependencies
-
-  - name: Install Lakeview for development
-    init: | 
-      gp sync-await dev_dependencies && 
-      pip install -ve .
 
   - name: Build docs
     init: |
