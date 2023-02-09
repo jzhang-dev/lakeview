@@ -1,3 +1,5 @@
+![Lakeview logo](docs/gallery/output/logo.svg)
+
 # Lakeview
 
 [![pytest](https://github.com/jzhang-dev/lakeview/actions/workflows/run_pytest.yml/badge.svg)](https://github.com/jzhang-dev/lakeview/actions/workflows/run_pytest.yml)

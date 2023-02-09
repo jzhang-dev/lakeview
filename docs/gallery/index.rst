@@ -7,6 +7,7 @@ Examples
 
    IGH
    SKBR3
+   logo
 
 
 

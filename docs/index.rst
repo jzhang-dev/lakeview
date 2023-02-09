@@ -3,6 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+
+.. figure:: gallery/output/logo.svg
+   :align: left
+   :width: 600
+   :alt: Lakeview logo
+
 Welcome to Lakeview's documentation!
 ====================================
 
