@@ -2,14 +2,20 @@
 # coding: utf-8
 
 from __future__ import annotations
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Mapping
+from dataclasses import dataclass, field
+from math import log10, ceil
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex
 from ._type_alias import Color, Point, Axes
 
-# TODO: auto tick formatter  as a function
+
+# Type alias
+BasePairUnit = Literal["bp", "kb", "Mb", "Gb", "Tb"]
+
+
 
 def get_cmap_colors(
     cmap_name: str, format_: Literal["hex", "rgb"] = "hex"
@@ -108,7 +114,7 @@ def scientific_notation(
     return s
 
 
-
+@dataclass(init=False)
 class BasePairFormatter(mpl.ticker.FuncFormatter):
     """
     A Matplotlib `tick formatter <https://matplotlib.org/stable/api/ticker_api.html#tick-formatting>`_ for common base pair units (bp, kb, Mb, Gb, Tb).
@@ -121,9 +127,20 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
     '844.29'
     """
 
+    unit: BasePairUnit
+    decimals: int
+    show_suffix: bool
+
+    UNITS: Sequence[BasePairUnit] = field(
+        default=("bp", "kb", "Mb", "Gb", "Tb"), repr=False
+    )
+    DIVISORS: Sequence[int] = field(
+        default=(1, int(1e3), int(1e6), int(1e9), int(1e12)), repr=False
+    )
+
     def __init__(
         self,
-        unit: Literal["bp", "kb", "Mb", "Gb", "Tb"],
+        unit: BasePairUnit,
         decimals: int | None = None,
         *,
         show_suffix: bool = True,
@@ -133,17 +150,20 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
         :param decimals: The number of decimal places to show for the coefficient. The default is 1 for 'bp', or 3 for other values of `unit`.
         :param show_suffix: Whether to show the unit as a suffix.
         """
+        self.unit = unit
+        self.show_suffix = show_suffix
         unit_divisor = self._get_unit_divisor(unit)
-        
+
         if decimals is None:
-            if unit == 'bp':
+            if unit == "bp":
                 decimals = 1
             else:
                 decimals = 3
+        self.decimals = decimals
 
         def formatter_function(x: float, pos) -> str:
             tick_label = format(x / unit_divisor, f".{decimals}f")
-            #print(unit_divisor)
+            # print(unit_divisor)
             if show_suffix:
                 tick_label += " " + unit
             return tick_label
@@ -151,16 +171,41 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
         super().__init__(formatter_function)
 
     @staticmethod
-    def _get_unit_divisor(unit: Literal["bp", "kb", "Mb", "Gb", "Tb"]) -> int:
-        UNIT_DIVISOR_DICT: dict[str, int] = dict(
-            bp=1, kb=int(1e3), Mb=int(1e6), Gb=int(1e9), Tb=int(1e12)
-        )
-        if unit in UNIT_DIVISOR_DICT:
-            unit_divisor: int = UNIT_DIVISOR_DICT[unit]
-            return unit_divisor
+    def _get_unit_divisor(unit: BasePairUnit) -> int:
+        UNITS = BasePairFormatter.UNITS
+        for _unit, divisor in zip(BasePairFormatter.UNITS, BasePairFormatter.DIVISORS):
+            if _unit == unit:
+                return divisor
         else:
             raise ValueError(
-                f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNIT_DIVISOR_DICT)!r}."
+                f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNITS)!r}."
             )
 
+    @classmethod
+    def from_limits(cls, limits: tuple[float, float], *, show_suffix: bool = True):
+        """
+        Automatically select reasonable `unit` and `decimals` based on axes limits.
 
+        >>> fig, ax = plt.subplots()
+        >>> ax.set_xlim(3200000, 5840000)
+        (3200000.0, 5840000.0)
+        >>> formatter = BasePairFormatter.from_limits(ax.get_xlim())
+        >>> formatter
+        BasePairFormatter(unit='Mb', decimals=1, show_suffix=True)
+        >>> ax.xaxis.set_major_formatter(formatter)
+        """
+
+        start, end = limits
+        if start > end:
+            start, end = end, start
+        span = end - start
+        for unit, unit_divisor in zip(reversed(cls.UNITS), reversed(cls.DIVISORS)):
+            if unit_divisor <= start:
+                break
+        decimals: int = max(0, 2 - ceil(log10(span / unit_divisor)))
+        formatter = cls(
+            unit,
+            decimals,
+            show_suffix=show_suffix,
+        )
+        return formatter

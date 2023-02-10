@@ -81,7 +81,7 @@ class _GenomeViewerWidget:
     def set_xlim(self, *args, **kw) -> tuple[float, float]:
         return self.axes[0].set_xlim(*args, **kw)
 
-    def _zoom(self, scale, /):
+    def _zoom(self, scale: float, /) -> None:
         for ax in self.figure.axes:
             old_xlim = ax.get_xlim()
             center = sum(old_xlim) / 2
@@ -91,7 +91,7 @@ class _GenomeViewerWidget:
             ax.set_xlim(new_xlim)
         self._update_display()
 
-    def _shift(self, distance, /):
+    def _shift(self, distance: float, /) -> None:
         for ax in self.figure.axes:
             old_xlim = ax.get_xlim()
             radius = (old_xlim[1] - old_xlim[0]) / 2
@@ -118,8 +118,7 @@ class _GenomeViewerWidget:
         self._update_display()
 
     def _update_xaxis_ticklabels(self) -> None:
-        start, end = self.get_xlim()
-        formatter = GenomeViewer._get_xaxis_tick_formatter(start, end)
+        formatter = BasePairFormatter.from_limits(self.get_xlim())
         self.axes[-1].xaxis.set_major_formatter(formatter)
 
     def _update_region_text(self) -> None:
@@ -188,8 +187,7 @@ class GenomeViewer:
         return self.axes[0].get_xlim()
 
     def use_base_pair_formatter(self) -> None:
-        start, end = self.get_xlim()
-        formatter = self._get_xaxis_tick_formatter(start, end)
+        formatter = BasePairFormatter.from_limits(self.get_xlim())
         self.axes[-1].xaxis.set_major_formatter(formatter)
 
     def set_xlabel(self, *args, **kw) -> mpl.text.Text:
@@ -204,28 +202,9 @@ class GenomeViewer:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(figure={self.figure!r})"
 
-    @staticmethod
-    def _get_xaxis_tick_formatter(start: float, end: float) -> BasePairFormatter:
-        span = end - start
-        unit_divisor: int
-        for unit in ("Tb", "Gb", "Mb", "kb", "bp"):
-            unit_divisor = BasePairFormatter._get_unit_divisor(
-                cast(Literal["bp", "kb", "Mb", "Gb", "Tb"], unit)
-            )  # mypy does not infer a string as a literal unless assigned directly
-            if unit_divisor <= start:
-                break
-        decimals: int = max(0, 2 - ceil(log10(span / unit_divisor)))
-        formatter = BasePairFormatter(
-            cast(Literal["bp", "kb", "Mb", "Gb", "Tb"], unit),
-            decimals,
-            show_suffix=True,
-        )
-        return formatter
-
     def clear(self) -> None:
         """
         Clear all contents in each Axes.
         """
         for ax in self.axes:
             ax.cla()
-

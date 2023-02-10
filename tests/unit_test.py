@@ -127,3 +127,35 @@ def test_get_aligned_query_sequence() -> None:
         seg.get_aligned_query_sequence(64_043_248) for seg in p.segments
     )
     assert counter["T"] == 91 and counter["G"] == 52
+
+
+
+def test_genome_viewer_widget_interactivity() -> None:
+    p = lv.SequenceAlignment.from_file(
+        "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam",
+        region=("17", (64041800, 64043800)),
+    )
+    gv = lv.GenomeViewer(2)
+    p.draw_pileup(gv.axes[0])
+    p.draw_alignment(gv.axes[1], show_mismatches=False)
+    gv.set_xlim(64041800, 64043400)
+    assert gv.get_xlim() == (64041800.0, 64043400.0)
+    widget = gv.widget
+    widget._shift(0.5)
+    assert gv.get_xlim() == (64042600.0, 64044200.0)
+    widget._shift(-0.5)
+    assert gv.get_xlim() == (64041800, 64043400)
+    widget._zoom(0.5)
+    assert gv.get_xlim() == (64042400.0, 64042800.0)
+    widget._zoom(3)
+    assert gv.get_xlim() == (64040800.0, 64044400.0)
+    widget._goto(64041800, 64043400)
+    assert gv.get_xlim() == (64041800, 64043400)
+    widget._goto_region("64041800-64043500")
+    assert gv.get_xlim() == (64041800, 64043500)
+
+
+
+
+
+
