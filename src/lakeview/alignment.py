@@ -980,7 +980,7 @@ class SequenceAlignment:
         group_separators_kw={},
     ):
         """
-        Draw sequence alignment patterns, in a style similar to `IGH alignment track <https://software.broadinstitute.org/software/igv/alignmentdata#alignmenttrack>`_.
+        Draw sequence alignment patterns, in a style similar to `IGV alignment track <https://software.broadinstitute.org/software/igv/alignmentdata#alignmenttrack>`_.
 
         Segments are drawn from top to bottom on the given ``ax``.
 
