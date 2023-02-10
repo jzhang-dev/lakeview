@@ -13,10 +13,11 @@ LinkIdentifier = Identifier
 GroupIdentifier = Identifier
 "Group identifier"
 Color = Union[Tuple[float, float, float], Tuple[float, float, float, float], str]
-"See https://matplotlib.org/stable/tutorials/colors/colors.html"
-Position = Union[int, float]
+"A color represented as one of the formats supported by Matplotlib. See https://matplotlib.org/stable/tutorials/colors/colors.html"
 Point = Tuple[float, float]
+"A point represented as tuple(x, y)."
 Line = Sequence[Point]
 Figure = mpl.figure.Figure
 Axes = mpl.axes.Axes
 Base = Literal["A", "T", "C", "G"]
+"a DNA base represented as a string"

@@ -21,7 +21,9 @@ def get_cmap_colors(
     cmap_name: str, format_: Literal["hex", "rgb"] = "hex"
 ) -> list[Color]:
     """
-    https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536
+    Get all colors for a given matplotlib palette.
+
+    Adapted from https://gist.github.com/jdbcode/33d37999f950a36b43e058d15280b536.
 
     >>> get_cmap_colors("Set2")
     ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3']
@@ -33,13 +35,13 @@ def get_cmap_colors(
     elif format_ == "hex":
         colors = [rgb2hex(c) for c in colors]
     else:
-        raise ValueError("`format_` must be one of {'rgb', 'hex'}")
+        raise ValueError(f"Invalid value for `format_`: {format_}. Expecting one of {'rgb', 'hex'}")
     return colors
 
 
 def get_random_colors(n: int, *, seed=0, cmap="hsv") -> list[Color]:
     """
-    Returns `n` random colors selected uniformly from `cmap`.
+    Returns ``n`` random colors selected uniformly from ``cmap``.
 
     >>> get_random_colors(3)
     [(0.0, 0.22463448382566054, 1.0, 1.0), (0.4018366371307548, 1.0, 0.0, 1.0), (1.0, 0.2316178786767022, 0.0, 1.0)]
@@ -147,7 +149,7 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
     ):
         """
         :param unit: Base pair unit.
-        :param decimals: The number of decimal places to show for the coefficient. The default is 1 for 'bp', or 3 for other values of `unit`.
+        :param decimals: The number of decimal places to show for the coefficient. The default is ``0`` for ``'bp'``, or ``3`` for other values of ``unit``.
         :param show_suffix: Whether to show the unit as a suffix.
         """
         self.unit = unit
@@ -156,7 +158,7 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
 
         if decimals is None:
             if unit == "bp":
-                decimals = 1
+                decimals = 0
             else:
                 decimals = 3
         self.decimals = decimals
@@ -178,7 +180,7 @@ class BasePairFormatter(mpl.ticker.FuncFormatter):
                 return divisor
         else:
             raise ValueError(
-                f"Invalid value for `unit`: {unit!r}. Supported values: {tuple(UNITS)!r}."
+                f"Invalid value for unit: {unit!r}. Supported values: {tuple(UNITS)!r}."
             )
 
     @classmethod
