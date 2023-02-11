@@ -8,6 +8,32 @@ import lakeview as lv
 from lakeview.plot import BasePairFormatter
 
 
+def test_readme_demo():
+    # Import Matplotlib and Lakeview
+    import matplotlib.pyplot as plt
+    import lakeview as lv
+
+    # Load aligned segments in a selected region from a BAM file
+    painter = lv.SequenceAlignment.from_file(
+        "tests/data/HG002_IGH_PacBio_CCS.bam", region="chr14:105,660,000-105,780,000"
+    )
+    # Create an empty GenomeViewer with one track
+    gv = lv.GenomeViewer(tracks=1, figsize=(8, 4))
+    # Plot sequence alignment
+    painter.draw_alignment(
+        gv.axes[0],
+        show_mismatches=False,
+        sort_by="length",
+        link_by="name",
+        max_rows=30,
+    )
+    # Adjust x axis limits
+    gv.set_xlim(105_670_000, 105_777_000)
+    # Save the plot
+    gv.savefig("tests/output/readme_demo.png")
+    assert os.path.getsize("tests/output/readme_demo.png") > 100e3
+
+
 def test_SKBR3():
     """
     These two BAM files have MD tag but no =/X CIGAR operations.
@@ -15,7 +41,7 @@ def test_SKBR3():
     CHROMOSOME = "17"
     ILLUMINA_BAM_PATH = "tests/data/SKBR3_Illumina_550bp_pcrFREE.bam"
     PACBIO_BAM_PATH = "tests/data/SKBR3_PacBio.bam"
-    
+
     illumina_painter = lv.SequenceAlignment.from_file(
         ILLUMINA_BAM_PATH, region=CHROMOSOME
     )
@@ -38,7 +64,7 @@ def test_SKBR3():
     gv.set_xlabel("chr17")
     gv.axes[-1].xaxis.set_major_formatter(BasePairFormatter("Mb"))
     gv.set_title("SKBR3")
-    
+
     OUTPUT_PNG_PATH = "tests/output/SKBR3_Illumina_PacBio.png"
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 200e3
@@ -98,7 +124,7 @@ def test_IGH():
     OUTPUT_PNG_PATH = "tests/output/IGH_PacBio_Gencode.png"
 
     with gzip.open(GENCODE_GTF_PATH, "rt") as f:
-        gencode_painter = lv.GeneAnnotation.from_gencode_gtf(
+        gencode_painter = lv.GeneAnnotation.from_gencode(
             f, "gtf", region=(CHROMOSOME, (START, END))
         )
     pacbio_painter = lv.SequenceAlignment.from_file(
@@ -117,7 +143,9 @@ def test_IGH():
         link_by="name",
         max_rows=50,
     )
-    gencode_painter.draw_transcripts(gv.axes[2], max_rows=5, sort_by="length", arrows_kw=dict(style="single"))
+    gencode_painter.draw_transcripts(
+        gv.axes[2], max_rows=5, sort_by="length", arrows_kw=dict(style="single")
+    )
 
     gv.set_xlim((105679000, 105776000))
     gv.set_xlabel(CHROMOSOME)
@@ -135,7 +163,7 @@ def test_GAPDH_RNAseq():
 
     alignment_painter = lv.SequenceAlignment.from_file(RNA_BAM_PATH, CHROMOSOME)
     with gzip.open(REFSEQ_GFF_PATH, "rt") as f:
-        annotation_painter = lv.GeneAnnotation.from_refseq_gff(
+        annotation_painter = lv.GeneAnnotation.from_refseq(
             f, "gff3", region=("NC_000012.11", (START, END))
         )
 

@@ -277,7 +277,7 @@ class GeneAnnotation:
         return cls(genes, transcripts, exons, cdss)
 
     @classmethod
-    def from_gencode_gtf(
+    def from_gencode(
         cls,
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],
@@ -298,7 +298,7 @@ class GeneAnnotation:
         return instance
 
     @classmethod
-    def from_refseq_gff(
+    def from_refseq(
         cls,
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],

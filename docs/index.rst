@@ -12,9 +12,9 @@
 Welcome to Lakeview's documentation!
 ====================================
 
-This is the documentation of Lakeview, which is currently under development and will be released by summer 2023. 
 
 Lakeview is a Python 3 library for creating publication-quality `IGV <https://software.broadinstitute.org/software/igv/>`_-style genomic visualizations. Lakeview is based on `Matplotlib <https://matplotlib.org/>`_. 
+
 
 
 Features

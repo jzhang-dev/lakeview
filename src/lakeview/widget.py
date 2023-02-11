@@ -144,6 +144,8 @@ class GenomeViewer:
         *,
         height_ratios: Optional[Sequence[float]] = None,
         figsize: tuple[float, float] = (10, 10),
+        xlim: tuple[float, float] | None = None,
+        use_tick_formatter: bool = True,
     ) -> None:
         with plt.ioff():
             fig, axes = plt.subplots(
@@ -159,6 +161,9 @@ class GenomeViewer:
         self._figure = fig
         self._axes = axes[:, 0]
         self._widget: _GenomeViewerWidget | None = None
+        self._use_tick_formatter:bool = use_tick_formatter
+        if xlim is not None:
+            self.set_xlim(xlim)
 
     @property
     def figure(self) -> Figure:
@@ -181,6 +186,9 @@ class GenomeViewer:
 
     def set_xlim(self, *args, **kw) -> tuple[float, float]:
         start, end = self.axes[0].set_xlim(*args, **kw)
+        if self._use_tick_formatter:
+            formatter = BasePairFormatter.from_limits(self.get_xlim())
+            self.axes[-1].xaxis.set_major_formatter(formatter)
         return start, end
 
     def get_xlim(self) -> tuple[float, float]:
@@ -196,8 +204,8 @@ class GenomeViewer:
     def set_title(self, *args, **kw) -> mpl.text.Text:
         self.axes[0].set_title(*args, **kw)
 
-    def savefig(self, *args, **kw) -> None:
-        self.figure.savefig(*args, **kw)
+    def savefig(self, *args, dpi=300, bbox_inches="tight", **kw) -> None:
+        self.figure.savefig(*args, dpi=300, bbox_inches=bbox_inches, **kw)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(figure={self.figure!r})"

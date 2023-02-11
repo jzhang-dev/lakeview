@@ -8,11 +8,37 @@ Lakeview is a Python 3 library for creating publication-quality [IGV](https://so
 
 A quick example:
 
-...
+```py
+# Import Matplotlib and Lakeview
+import matplotlib.pyplot as plt
+import lakeview as lv
+
+# Load aligned segments in a selected region from a BAM file
+painter = lv.SequenceAlignment.from_file(
+    "PacBio_HiFi.bam", region="chr14:105,660,000-105,780,000"
+)
+# Create an empty GenomeViewer with one track
+gv = lv.GenomeViewer(tracks=1, figsize=(8, 4))
+# Plot sequence alignment
+painter.draw_alignment(
+    gv.axes[0],               # Plot on the first track of the GenomeViewer
+    show_mismatches=False,    # Do not show mismatched bases
+    sort_by="length",         # Plot longer reads first
+    link_by="name",           # Link primary and supplementary alignments of the same read
+    max_rows=30,              # Only show the first 30 alignment rows
+)
+# Adjust x axis limits
+gv.set_xlim(105_670_000, 105_777_000)
+# Save the plot
+gv.savefig("example.png")
+```
+
+Lakeview currently supports visualzing sequence alignment, pileup, and gene annotation tracks. Additional functionality will be added in the future. 
 
 Try Lakeview interactively with Binder:
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jzhang-dev/lakeview/HEAD)
+ 
 
 ## Features
 
@@ -23,6 +49,10 @@ Try Lakeview interactively with Binder:
 - **Customizable layouts**. Lakeview supports many layouts implemented in [IGV](https://software.broadinstitute.org/software/igv/), while allowing the user to define custom rules for ordering, groupping, and coloring each segment. Advanced customization is possible via the [Matplotlib](https://matplotlib.org/) API.
 
 ## Installation
+
+```sh
+pip install lakeview
+```
 
 ## Documentation
 
