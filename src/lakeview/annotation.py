@@ -10,7 +10,7 @@ from math import floor
 import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.path import Path
-from ._region_notation import (
+from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,

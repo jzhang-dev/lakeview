@@ -5,7 +5,7 @@ __author__ = "Jia-Yuan Zhang"
 __email__ = "jzhang@well.ox.ac.uk"
 
 
-from . import alignment, annotation, plot, remote, sequence, widget
+from . import alignment, annotation, plot, region_notation, remote, sequence, widget
 
 SequenceAlignment = alignment.SequenceAlignment
 GeneAnnotation = annotation.GeneAnnotation

@@ -10,12 +10,69 @@ from typing import Literal, Sequence, Collection, Mapping
 import numpy as np
 from Bio import SeqIO
 
-from . import util
-
-# This module is currently under development and delibrately left undocumented
 
 # Type aliases
 Kmer = str
+
+
+def init_reverse_complement():
+    TRANSLATION_TABLE = str.maketrans("ACTGactg", "TGACtgac")
+
+    def reverse_complement(sequence):
+        """
+        >>> reverse_complement("AATC")
+        'GATT'
+        >>> reverse_complement("CCANT")
+        'ANTGG'
+        """
+        sequence = str(sequence)
+        return sequence.translate(TRANSLATION_TABLE)[::-1]
+
+    return reverse_complement
+
+
+reverse_complement = init_reverse_complement()
+
+
+def is_canonical(kmer):
+    """
+    >>> is_canonical("ATC")
+    True
+    >>> is_canonical("GGC")
+    False
+    """
+    # This function uses the alphabetical/lexicographical ("ACGT") order to determine canonical kmers. 
+    # JellyFish also uses the "ACGT" order, while Meryl uses the "ACTG" order by default. See https://github.com/marbl/meryl/blob/69c839cf43b774916b9a004f8143a00d4f9aac86/src/meryl2/merylOp-nextMer.C#L30
+    return kmer <= reverse_complement(kmer)
+
+
+def canonicalize(kmer):
+    canonical_kmer = min(kmer, reverse_complement(kmer))
+    return canonical_kmer
+
+
+def enumerate_kmers(sequence, k, strand="single", drop_N=True):
+    """
+    >>> list(enumerate_kmers("AATGANGGG", 3, 'canonical'))
+    [(0, 'AAT'), (1, 'ATG'), (2, 'TCA'), (6, 'CCC')]
+    """
+    if len(sequence) < k:
+        raise ValueError
+    if strand not in ("single", "canonical"):
+        raise ValueError
+
+    sequence = str(sequence).upper()
+    l = len(sequence)
+    for i in range(l):
+        if i + k > l:
+            return
+        kmer = sequence[i : i + k]
+        if drop_N and "N" in kmer:
+            continue
+        if strand == "single":
+            yield i, kmer
+        elif strand == "canonical":
+            yield i, canonicalize(kmer)
 
 
 def load_multiple_sequences(
@@ -106,9 +163,9 @@ class DotPlot:
     ) -> Mapping[Kmer, Sequence[int]]:
         rng = np.random.default_rng(seed=seed)
         kmer_indices = collections.defaultdict(list)
-        for index, kmer in util.enumerate_kmers(sequence, k, strand="single"):
+        for index, kmer in enumerate_kmers(sequence, k, strand="single"):
             if sample_fraction == 1 or rng.random() <= sample_fraction:
-                canonical_kmer = util.canonicalize(kmer)
+                canonical_kmer = canonicalize(kmer)
                 kmer_indices[canonical_kmer].append(index)
         return kmer_indices
 

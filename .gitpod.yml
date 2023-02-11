@@ -22,12 +22,12 @@ tasks:
 
   - name: Run HTTP server
     init: gp sync-await dev_dependencies
-    command: cd docs && python3 -m http.server 8000
+    command: cd docs/_build/html && python3 -m http.server 8000
 
 ports:
   - name: JupyterLab
     port: 9999
-    onOpen: notify
+    onOpen: ignore
 
   - name: HTTP Server
     port: 8000

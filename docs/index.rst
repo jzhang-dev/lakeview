@@ -48,7 +48,7 @@ A quick example:
    gv.savefig("example.png")
 
 .. figure:: ../tests/output/readme_demo.png
-   :width: 600
+   :width: 100%
    :alt: example.png
 
 

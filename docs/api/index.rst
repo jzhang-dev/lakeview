@@ -10,6 +10,7 @@ API Reference
    GenomeViewer
    plot
    remote
+   region_notation
    type_alias
 
 

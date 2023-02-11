@@ -31,7 +31,7 @@ import pysam
 
 from .plot import get_ax_size
 from ._layout import key_filter, key_sort, pack_intervals
-from ._region_notation import (
+from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,
@@ -629,7 +629,7 @@ class SequenceAlignment:
            The SAM format is not supported as it does not allow random access.
 
         :param file_path: Path to the BAM file.
-        :param region: Region to load alignment records from. See :ref:`Specifying regions of interest`.
+        :param region: region to load alignment records from. See :py:mod:`lakeview.region_notation` for additional details.
         :param kw: Keyword arguments passed to :external:class:`pysam.AlignmentFile`.
         """
         with pysam.AlignmentFile(
@@ -652,10 +652,10 @@ class SequenceAlignment:
         .. note::
            The SAM format is not supported as it does not allow random access.
 
-        :param url: URL to the remote BAM file.
-        :param region: Region to load alignment records from. See :ref:`Specifying regions of interest`.
-        :param index_url: URL to the remote BAM index (.bai) file. The default is ``url + '.bai'``.
-        :param kw: Keyword arguments passed to :external:class:`pysam.AlignmentFile`.
+        :param url: URL to the remote BAM file
+        :param region: region to load alignment records from. See :py:mod:`lakeview.region_notation` for additional details.
+        :param index_url: URL to the remote BAM index (.bai) file. The default is ``url + '.bai'``
+        :param kw: keyword arguments passed to :external:class:`pysam.AlignmentFile`
         """
         workdir = os.getcwd()
         with tempfile.TemporaryDirectory() as d:

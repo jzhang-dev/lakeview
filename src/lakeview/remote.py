@@ -7,7 +7,7 @@ import os
 import pathlib
 from typing import Literal, Callable, Optional, Union
 import pysam
-from ._region_notation import (
+from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,

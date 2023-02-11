@@ -204,8 +204,8 @@ class GenomeViewer:
     def set_title(self, *args, **kw) -> mpl.text.Text:
         self.axes[0].set_title(*args, **kw)
 
-    def savefig(self, *args, dpi=300, bbox_inches="tight", **kw) -> None:
-        self.figure.savefig(*args, dpi=300, bbox_inches=bbox_inches, **kw)
+    def savefig(self, *args, dpi=300, bbox_inches="tight", **kw):
+        return self.figure.savefig(*args, dpi=300, bbox_inches=bbox_inches, **kw)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(figure={self.figure!r})"
