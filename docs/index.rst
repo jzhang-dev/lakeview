@@ -5,16 +5,51 @@
 
 
 .. figure:: gallery/output/logo.svg
-   :align: left
    :width: 600
    :alt: Lakeview logo
 
-Welcome to Lakeview's documentation!
+Lakeview documentation
 ====================================
 
 
 Lakeview is a Python 3 library for creating publication-quality `IGV <https://software.broadinstitute.org/software/igv/>`_-style genomic visualizations. Lakeview is based on `Matplotlib <https://matplotlib.org/>`_. 
 
+
+A quick example:
+
+.. code:: py
+
+   # Import Matplotlib and Lakeview
+   import matplotlib.pyplot as plt
+   import lakeview as lv
+
+   # Load aligned segments in a selected region from a BAM file
+   painter = lv.SequenceAlignment.from_file(
+       "PacBio_HiFi.bam", region="chr14:105,660,000-105,780,000"
+   )
+   # Create an empty GenomeViewer with one track
+   gv = lv.GenomeViewer(tracks=1, figsize=(8, 4))
+   # Plot sequence alignment
+   painter.draw_alignment(
+       gv.axes[0],               # Plot on the first track of the GenomeViewer
+       show_mismatches=False,    # Do not show mismatched bases
+       sort_by="length",         # Plot longer reads first
+       link_by="name",           # Link primary and supplementary alignments of the same read
+       max_rows=30,              # Only show the first 30 alignment rows
+   )
+   # Adjust x axis limits
+   gv.set_xlim(105_670_000, 105_777_000)
+   # Save the plot
+   gv.savefig("example.png")
+
+.. figure:: ../tests/output/readme_demo.png
+   :width: 600
+   :alt: example.png
+
+
+Lakeview currently supports visualzing sequence alignment, pileup, and
+gene annotation tracks. Additional functionality will be added in the
+future.
 
 
 Features

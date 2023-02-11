@@ -33,6 +33,8 @@ gv.set_xlim(105_670_000, 105_777_000)
 gv.savefig("example.png")
 ```
 
+![example.png](tests/output/readme_demo.png)
+
 Lakeview currently supports visualzing sequence alignment, pileup, and gene annotation tracks. Additional functionality will be added in the future. 
 
 Try Lakeview interactively with Binder:
