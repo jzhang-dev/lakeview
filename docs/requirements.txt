@@ -1,4 +1,5 @@
 Jinja2 == 3.0.3
 myst-nb == 0.17.1
+myst-parser == 0.18.1
 sphinx == 4.5.0
 sphinx-book-theme == 0.3.3

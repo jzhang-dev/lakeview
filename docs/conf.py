@@ -20,10 +20,12 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "myst_nb",
     "IPython.sphinxext.ipython_console_highlighting",
+    "myst_parser",
 ]
 source_suffix = {
     ".rst": "restructuredtext",
     ".ipynb": "myst-nb",
+    '.md': 'markdown',
 }
 
 # templates_path = ['_templates']
