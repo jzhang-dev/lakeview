@@ -28,14 +28,19 @@ A quick example:
        "PacBio_HiFi.bam", region="chr14:105,660,000-105,780,000"
    )
    # Create an empty GenomeViewer with one track
-   gv = lv.GenomeViewer(tracks=1, figsize=(8, 4))
-   # Plot sequence alignment
+   gv = lv.GenomeViewer(tracks=2, figsize=(8, 5), height_ratios=(1, 4))
+   # Plot alignment pileup
+   painter.draw_pileup(
+       gv.axes[0],             # Plot on the first track of the GenomeViewer
+       show_mismatches=False,  # Do not highlight mismatched bases
+   )
+   # Plot aligned segments
    painter.draw_alignment(
-       gv.axes[0],               # Plot on the first track of the GenomeViewer
-       show_mismatches=False,    # Do not show mismatched bases
-       sort_by="length",         # Plot longer reads first
-       link_by="name",           # Link primary and supplementary alignments of the same read
-       max_rows=30,              # Only show the first 30 alignment rows
+       gv.axes[1],             # Plot on the second track of the GenomeViewer
+       show_mismatches=False,  # Do not highlight mismatched bases
+       sort_by="length",       # Plot longer reads first
+       link_by="name",         # Link primary and supplementary alignments of the same read
+       max_rows=30,            # Only show the first 30 alignment rows
    )
    # Adjust x axis limits
    gv.set_xlim(105_670_000, 105_777_000)
