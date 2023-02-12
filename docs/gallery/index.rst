@@ -7,6 +7,9 @@ Examples
 
    IGH
    SKBR3
+   GAPDH
+   SNURF
+   Exome
    logo
 
 

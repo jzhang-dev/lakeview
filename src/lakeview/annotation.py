@@ -155,12 +155,15 @@ class GeneAnnotation:
                 f"Invalid value for `format_`: {format!r}. Expecting one of ('gtf', 'gff3')."
             )
 
+
         records: list[AnnotationRecord] = []
+        visited_sequence_names: set[str] = set()
         for line in file_object:
             if line.startswith("#"):
                 continue
             data = line.strip("\n").split("\t")
             seqname = data[0]
+            visited_sequence_names.add(seqname)
             if sequence_name is not None and seqname != sequence_name:
                 continue
             source = data[1]
@@ -191,6 +194,8 @@ class GeneAnnotation:
                     attributes=attr_dict,
                 )
             )
+        if len(records) == 0 and sequence_name is not None and sequence_name not in visited_sequence_names:
+            raise ValueError(f"Invalid sequence name: {sequence_name!r}. Found following sequence names in the file: {visited_sequence_names!r}")
         return records
 
     @classmethod
