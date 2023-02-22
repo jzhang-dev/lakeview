@@ -12,6 +12,7 @@ tasks:
     init: |
       gp sync-await dev_dependencies && 
       sphinx-build -W --keep-going -E -b html docs/ docs/_build/html
+      gp sync-done build_docs
 
   - name: Run JupyterLab
     init: gp sync-await dev_dependencies
@@ -21,7 +22,7 @@ tasks:
       jupyter lab --no-browser --ip=0.0.0.0 --port=9999 --NotebookApp.token='' --NotebookApp.password=''
 
   - name: Run HTTP server
-    init: gp sync-await dev_dependencies
+    init: gp sync-await build_docs
     command: cd docs/_build/html && python3 -m http.server 8000
 
 ports:
