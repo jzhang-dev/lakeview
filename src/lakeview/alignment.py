@@ -872,7 +872,7 @@ class SequenceAlignment:
         self,
         group_by: Callable[[AlignedSegment], GroupIdentifier]
         | Iterable[GroupIdentifier]
-        | Literal["haplotype", "proper_pair", "strand"]
+        | Literal["haplotype", "name", "proper_pair", "strand"]
         | None,
     ) -> Sequence[GroupIdentifier]:
         segments = self.segments
@@ -887,6 +887,8 @@ class SequenceAlignment:
                     seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
                     for seg in segments
                 ]
+            elif group_by == "name":
+                group_identifiers = [seg.query_name for seg in segments]
             elif group_by == "proper_pair":
                 group_identifiers = [seg.is_proper_pair for seg in segments]
             elif group_by == "strand":
@@ -937,7 +939,7 @@ class SequenceAlignment:
         | None = None,  # TODO: link by pair
         group_by: Callable[[AlignedSegment], GroupIdentifier]
         | Iterable[GroupIdentifier]
-        | Literal["haplotype", "proper_pair", "strand"]
+        | Literal["haplotype", "name", "proper_pair", "strand"]
         | None = None,
         color_by: Callable[[AlignedSegment], Color]
         | Iterable[Color]
@@ -996,20 +998,20 @@ class SequenceAlignment:
         :param max_rows: The maximum number of rows to layout segments. Excess segments will not be drawn. If multiple segment groups exist, this parameter limits the maximum number of rows *per group*.
         :param show_backbones: Whether to show segment backbones (i.e. horizontal bars representing aligned positions of each segment).
         :param show_arrowheads: Whether to show triangular arrowheads to denote segment orientations.
-        :param show_links: Whether to show horizontal lines connecting linked segments. Only has effect when ``link_by`` is specified. 
+        :param show_links: Whether to show horizontal lines connecting linked segments. Only has effect when ``link_by`` is specified.
         :param show_insertions: Whether to show the "I"-shaped markers to denote insertions.
-        :param min_insertion_size: Insertions below ``min_insertion_size`` will not be shown. 
-        :param show_deletions: Whether to show the horizontal dash markers to denote deletions. 
-        :param min_deletion_size: Deletions below ``min_deletion_size`` will not be shown. 
+        :param min_insertion_size: Insertions below ``min_insertion_size`` will not be shown.
+        :param show_deletions: Whether to show the horizontal dash markers to denote deletions.
+        :param min_deletion_size: Deletions below ``min_deletion_size`` will not be shown.
         :param show_mismatches: Whether to show vertical lines denoting mismatched bases. Requires the CIGAR X (BAM_CDIFF) operation or the MD tag. See :py:attr:`lakeview.alignment.AlignedSegment.mismatched_bases` for details.
         :param show_modified_bases: Whether to show vertical lines denoting DNA modification. Requires the Ml and Mm tags. See :py:attr:`lakeview.alignment.AlignedSegment.modified_bases` for details.
-        :param show_soft_clippings: Whether to show markers at segment ends denoting soft-clipped bases. 
-        :param min_soft_clipping_size: Soft-clipping below ``min_soft_clipping_size`` will not be shown. 
-        :param show_hard_clippings: Whether to show markers at segment ends denoting hard-clipped bases. 
-        :param min_hard_clipping_size: Hard-clipping below ``min_hard_clipping_size`` will not be shown. 
+        :param show_soft_clippings: Whether to show markers at segment ends denoting soft-clipped bases.
+        :param min_soft_clipping_size: Soft-clipping below ``min_soft_clipping_size`` will not be shown.
+        :param show_hard_clippings: Whether to show markers at segment ends denoting hard-clipped bases.
+        :param min_hard_clipping_size: Hard-clipping below ``min_hard_clipping_size`` will not be shown.
         :param show_reference_skips: Whether to show horizontal lines denoting reference skips. Reference skips are commonly found in intron regions of RNA-seq reads.
-        :param show_group_labels: Whether to show a text label for each segment group. If ``None``, group labels will only be shown when ``group_by`` is specified. 
-        :param show_group_separators: Whether to show horizontal separator lines between adjacent segment groups. 
+        :param show_group_labels: Whether to show a text label for each segment group. If ``None``, group labels will only be shown when ``group_by`` is specified.
+        :param show_group_separators: Whether to show horizontal separator lines between adjacent segment groups.
 
         .. note::
            For a detailed explaination on the usage of ``filter_by``, ``sort_by``, ``link_by``, ``group_by``, and ``color_by``, see :ref:`Custom layout`.
@@ -1195,7 +1197,7 @@ class SequenceAlignment:
         MARKER = Path([(0, 0.5), (0, -0.5)], readonly=True)
         lines: list[tuple[Point, Point]] = []
         line_colors: list[Color] = []
-        marker_xs : list[float] = []
+        marker_xs: list[float] = []
         marker_ys: list[float] = []
         marker_colors: list[Color] = []
         for seg, y, color in zip(segments, offsets, colors):
@@ -1872,8 +1874,6 @@ class SequenceAlignment:
                 **kw,
             )
             bottom += counts
-
-
 
 
 class OpticalMapAlignment:
