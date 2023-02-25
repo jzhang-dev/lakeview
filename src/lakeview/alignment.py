@@ -309,6 +309,8 @@ class AlignedSegment:
         "alias of :external:py:attr:`pysam.AlignedSegment.is_secondary`"
         self.is_mapped: bool = wrapped.is_mapped  # type: ignore
         "alias of :external:py:attr:`pysam.AlignedSegment.is_mapped`"
+        self.mapping_quality: int = wrapped.mapping_quality
+        "alias of :external:py:attr:`pysam.AlignedSegment.mapping_quality`"
         self.query_alignment_length: int = wrapped.query_alignment_length
         "alias of :external:py:attr:`pysam.AlignedSegment.query_alignment_length`"
 
@@ -1014,7 +1016,7 @@ class SequenceAlignment:
         :param show_group_separators: Whether to show horizontal separator lines between adjacent segment groups.
 
         .. note::
-           For a detailed explaination on the usage of ``filter_by``, ``sort_by``, ``link_by``, ``group_by``, and ``color_by``, see :ref:`Custom layout`.
+           For a detailed explaination on the usage of ``filter_by``, ``sort_by``, ``link_by``, ``group_by``, and ``color_by``, see :ref:`Customising alignment layout`.
 
         """
         segments: Sequence[AlignedSegment] = self.segments

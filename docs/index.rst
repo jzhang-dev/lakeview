@@ -19,15 +19,14 @@ A quick example:
 
 .. code:: py
 
-   # Import Matplotlib and Lakeview
-   import matplotlib.pyplot as plt
+   # Import Lakeview
    import lakeview as lv
 
    # Load aligned segments in a selected region from a BAM file
    painter = lv.SequenceAlignment.from_file(
        "PacBio_HiFi.bam", region="chr14:105,660,000-105,780,000"
    )
-   # Create an empty GenomeViewer with one track
+   # Create an empty GenomeViewer with two tracks
    gv = lv.GenomeViewer(tracks=2, figsize=(8, 5), height_ratios=(1, 4))
    # Plot alignment pileup
    painter.draw_pileup(
