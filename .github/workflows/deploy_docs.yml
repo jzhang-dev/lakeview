@@ -33,9 +33,13 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.8' 
-      - name: Install Lakeview with pip
+      - name: Install with pip
         run: |
           pip install -v .
+      - name: Run pytest
+        run: |
+          pip install pytest
+          pytest
       - name: Install doc dependences with pip
         run: |
           pip install -v -r docs/requirements.txt
