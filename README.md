@@ -1,8 +1,9 @@
-![Lakeview logo](docs/gallery/output/logo.svg)
+![Lakeview logo](https://jzhang-dev.github.io/lakeview/_images/logo.svg)
 
 # Lakeview
 
 [![pytest](https://github.com/jzhang-dev/lakeview/actions/workflows/run_pytest.yml/badge.svg)](https://github.com/jzhang-dev/lakeview/actions/workflows/run_pytest.yml)
+[![mypy](https://github.com/jzhang-dev/lakeview/actions/workflows/type_check_with_mypy.yml/badge.svg)](https://github.com/jzhang-dev/lakeview/actions/workflows/type_check_with_mypy.yml)
 
 Lakeview is a Python 3 library for creating publication-quality [IGV](https://software.broadinstitute.org/software/igv/)-style genomic visualizations. Lakeview is based on [Matplotlib](https://matplotlib.org/). 
 
@@ -37,7 +38,7 @@ gv.set_xlim(105_670_000, 105_777_000)
 gv.savefig("example.png")
 ```
 
-![example.png](tests/output/readme_demo.png)
+![example.png](https://jzhang-dev.github.io/lakeview/_images/readme_demo.png)
 
 Lakeview currently supports visualzing sequence alignment, pileup, and gene annotation tracks. Additional functionality will be added in the future. 
 
