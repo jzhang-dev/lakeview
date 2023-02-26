@@ -1,17 +1,18 @@
-[build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "lakeview"
-description = "A Python library for creating publication-quality genome visualisations."
 readme = "README.md"
-version = "0.1.0"
-requires-python = ">=3.8"
+version = "0.1.1"
+authors = [{name="Jia-Yuan Zhang", email="jiayuan.zhang@ndm.ox.ac.uk"}]
+description = "A Python library for creating publication-quality genome visualisations."
 keywords = ["bioinformatics", "genomics", "visualisation"]
+requires-python = ">=3.8"
 license = {text = "GNU GENERAL PUBLIC LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
 ]
 dependencies = [
     "Bio >= 1.5.2",
@@ -21,3 +22,11 @@ dependencies = [
     "pygments >= 2.13.0",
     "pysam >= 0.20.0",
 ]
+
+[project.urls]
+"Homepage" = "https://jzhang-dev.github.io/lakeview/"
+"Bug Tracker" = "https://github.com/jzhang-dev/lakeview/issues"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
