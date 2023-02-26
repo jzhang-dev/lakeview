@@ -1,7 +1,7 @@
 [project]
 name = "lakeview"
 readme = "README.md"
-version = "0.1.1"
+version = "0.1.2"
 authors = [{name="Jia-Yuan Zhang", email="jiayuan.zhang@ndm.ox.ac.uk"}]
 description = "A Python library for creating publication-quality genome visualisations."
 keywords = ["bioinformatics", "genomics", "visualisation"]
