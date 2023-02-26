@@ -5,6 +5,7 @@ channels:
  - defaults
 dependencies:
   - jupyterlab >= 3.0.0
+  - pip >= 22.3.1
   - pip:
     - lakeview
   - python >= 3.8
