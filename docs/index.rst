@@ -11,6 +11,10 @@
 Lakeview documentation
 ====================================
 
+.. image:: https://mybinder.org/badge_logo.svg
+ :target: https://mybinder.org/v2/gh/jzhang-dev/lakeview/HEAD?labpath=docs%2Ftutorials%2Fquick_start.ipynb
+
+
 
 Lakeview is a Python 3 library for creating publication-quality `IGV <https://software.broadinstitute.org/software/igv/>`_-style genomic visualizations. Lakeview is based on `Matplotlib <https://matplotlib.org/>`_. 
 

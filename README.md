@@ -44,7 +44,7 @@ Lakeview currently supports visualzing sequence alignment, pileup, and gene anno
 
 Try Lakeview interactively with Binder:
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jzhang-dev/lakeview/HEAD)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jzhang-dev/lakeview/HEAD?labpath=docs%2Ftutorials%2Fquick_start.ipynb)
  
 
 ## Features
