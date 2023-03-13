@@ -462,6 +462,8 @@ class AlignedSegment:
     @functools.cached_property
     def modified_bases(self) -> list[ModifiedBase]:
         "modified bases identified from the Ml and Mm tags; see :external:attr:`pysam.AlignedSegment.modified_bases`"
+        if self.wrapped.modified_bases is None: # type: ignore # modified_bases is not correctly typed 
+            return []
         modified_bases = []
         for (
             (
@@ -470,7 +472,7 @@ class AlignedSegment:
                 modification,
             ),
             data,
-        ) in self.wrapped.modified_bases.items():  # type: ignore
+        ) in self.wrapped.modified_bases.items(): # type: ignore # modified_bases is not correctly typed 
             strand = {0: "+", 1: "-"}[strand]
             for pos, qual in data:
                 if qual == -1:
