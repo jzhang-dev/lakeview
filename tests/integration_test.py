@@ -93,7 +93,7 @@ def test_SKBR3():
     )
     gv.set_xlim(64042997, 64043297)
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
-    assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
+    assert os.path.getsize(OUTPUT_PNG_PATH) > 50e3
 
 
 def test_GNAS_WES():

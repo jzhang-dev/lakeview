@@ -6,6 +6,8 @@ from typing import Union, Literal, Tuple, Sequence
 from collections.abc import Hashable
 import matplotlib as mpl
 
+Region = Union[str , Tuple[str, Tuple[float, float]] , Tuple[str, None]]
+"A region of interest"
 Identifier = Union[int , float , str , Tuple[Hashable, ...]]
 "Identifier"
 LinkIdentifier = Identifier

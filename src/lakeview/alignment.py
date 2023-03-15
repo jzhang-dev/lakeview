@@ -35,6 +35,7 @@ from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,
+    InvalidRegionNotationError
 )
 from ._type_alias import (
     Identifier,
@@ -565,11 +566,12 @@ class SequenceAlignment:
     def _from_pysam(
         cls,
         alignment_file: pysam.AlignmentFile,
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: str | tuple[str, tuple[float, float]] | tuple[str, None],
     ):
         # Parse region
         reference_name: str
         normalized_region: str
+        interval: tuple[float, float] | None
         if isinstance(region, str):
             reference_name, interval = parse_region_notation(region)
             normalized_region = normalize_region_notation(region)
@@ -577,9 +579,7 @@ class SequenceAlignment:
             reference_name, interval = region
             normalized_region = get_region_notation(reference_name, interval)
         else:
-            raise TypeError(
-                f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
-            )
+            raise InvalidRegionNotationError(region)
         # Check `reference_name`
         reference_names: set[str] = set(alignment_file.references)
         if reference_name not in reference_names:
@@ -620,7 +620,7 @@ class SequenceAlignment:
     def from_file(
         cls,
         file_path: str,  # Pysam does not support reading and writing from true python file objects. See https://pysam.readthedocs.io/en/latest/usage.html#using-streams
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: str | tuple[str, tuple[float, float]] | tuple[str, None],
         **kw,
     ):
         """
@@ -645,7 +645,7 @@ class SequenceAlignment:
     def from_remote(
         cls,
         url: str,
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: str | tuple[str, tuple[float, float]] | tuple[str, None],
         *,
         index_url: str | None = None,
         **kw,

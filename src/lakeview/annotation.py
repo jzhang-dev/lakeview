@@ -14,10 +14,11 @@ from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,
+    InvalidRegionNotationError
 )
 from .plot import get_ax_size
 from ._layout import key_filter, key_sort, pack_intervals
-from ._type_alias import GroupIdentifier, Color, Axes, Identifier
+from ._type_alias import GroupIdentifier, Color, Axes, Identifier, Region
 
 
 @dataclass
@@ -105,22 +106,20 @@ class GeneAnnotation:
     @staticmethod
     def _parse_file(
         file_object: TextIO,
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: Region,
         *,
         format_: Literal["gtf", "gff", "gff3"],
         features: Container[str],
     ) -> Sequence[AnnotationRecord]:
         # Parse region
         sequence_name: str
-        interval: tuple[int, int] | None
+        interval: tuple[float, float] | None
         if isinstance(region, str):
             sequence_name, interval = parse_region_notation(region)
         elif isinstance(region, tuple):
             sequence_name, interval = region
         else:
-            raise TypeError(
-                f"Invalid type for `region`: {region!r}. Expecting an instance of str | tuple[str, tuple[int, int]] | tuple[str, None]."
-            )
+            raise InvalidRegionNotationError(region)
         start: float
         end: float
         if interval is None:
@@ -203,7 +202,7 @@ class GeneAnnotation:
         cls,
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: Region,
         *,
         gene_features: Iterable[str] = ["gene"],
         transcript_features: Iterable[str] = ["transcript"],
@@ -277,7 +276,7 @@ class GeneAnnotation:
         cls,
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: Region,
     ):  
         # Parse gene_key and transcript_key
         # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications; 
@@ -318,7 +317,7 @@ class GeneAnnotation:
         cls,
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],
-        region: str | tuple[str, tuple[int, int]] | tuple[str, None],
+        region: Region,
     ):  
         # Parse gene_key and transcript_key
         # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications; 

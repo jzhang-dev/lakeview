@@ -8,6 +8,7 @@ from math import log10, ceil
 from warnings import warn
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.transforms import Bbox
 from matplotlib.ticker import MaxNLocator
 from IPython.display import display
 import ipywidgets
@@ -107,7 +108,7 @@ class _GenomeViewerWidget:
         self._update_display()
 
     def _goto_region(self, region: str) -> None:
-        start, end = region.split("-")
+        start, end = region.replace(" ", "").replace(",", "").split("-")
         if start.isnumeric() and end.isnumeric():
             self._goto(float(start), float(end))
         else:
@@ -143,10 +144,14 @@ class GenomeViewer:
         tracks: int = 1,
         *,
         height_ratios: Optional[Sequence[float]] = None,
-        figsize: tuple[float, float] = (10, 10),
+        figsize: tuple[float, float] = (8, 8),
         xlim: tuple[float, float] | None = None,
         use_tick_formatter: bool = True,
+        use_tick_locator: bool = True,
+        constrained_layout: bool = True,
+        figure_kw=dict(),
     ) -> None:
+
         with plt.ioff():
             fig, axes = plt.subplots(
                 nrows=tracks,
@@ -156,12 +161,22 @@ class GenomeViewer:
                 sharey=False,
                 squeeze=False,
                 gridspec_kw=dict(height_ratios=height_ratios),
-                constrained_layout=True,
+                constrained_layout=constrained_layout,
+                **figure_kw,
             )
+            fig.get_layout_engine().set(w_pad=0.3)
+
+            # Create a hidden Axes that is as wide as the Figure and has no height
+            # This prevents the Figure from resizing when changing xlim interactively
+            shadow_ax = fig.add_axes(Bbox.from_extents(0, 0.5, 1, 0.5))
+            shadow_ax.axis("off")
+
         self._figure = fig
         self._axes = axes[:, 0]
         self._widget: _GenomeViewerWidget | None = None
-        self._use_tick_formatter:bool = use_tick_formatter
+        self._use_tick_formatter: bool = use_tick_formatter
+        if use_tick_locator:
+            self.axes[-1].xaxis.set_major_locator(MaxNLocator(3))
         if xlim is not None:
             self.set_xlim(xlim)
 

@@ -153,6 +153,8 @@ def test_genome_viewer_widget_interactivity() -> None:
     assert gv.get_xlim() == (64041800, 64043400)
     widget._goto_region("64041800-64043500")
     assert gv.get_xlim() == (64041800, 64043500)
+    widget._goto_region(widget._region_text.value)
+    assert gv.get_xlim() == (64041800, 64043500)
 
 
 

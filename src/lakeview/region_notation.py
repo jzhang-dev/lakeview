@@ -14,14 +14,12 @@ This module contains functions for the parsing and conversion of valid region no
 """
 
 from __future__ import annotations
-from typing import Optional, Union
-
-
-
+from typing import Optional, Union, Any
+from math import floor, ceil
 
 
 def get_region_notation(
-    sequence_name, interval: Optional[tuple[int, int]] = None
+    sequence_name, interval: Optional[tuple[float, float]] = None
 ) -> str:
     """
     Returns a samtools-compatible region string from ``sequence_name``, ``start``, and ``end``.
@@ -32,11 +30,15 @@ def get_region_notation(
     'chr1:15001-20000'
     >>> get_region_notation("chr1")
     'chr1'
+    >>> get_region_notation("chr1", (234.2, 480.8))
+    'chr1:235-481'
     """
     if interval is None:
         return sequence_name
     else:
         start, end = interval
+        start = floor(start)
+        end = ceil(end)
         return f"{sequence_name}:{start+1}-{end}"
 
 
@@ -62,36 +64,47 @@ def parse_region_notation(
     >>> parse_region_notation("chr14:200")
     Traceback (most recent call last):
         ...
-    ValueError: Invalid `region_notation`: 'chr14:200'
+    lakeview.region_notation.InvalidRegionNotationError: Unable to parse region: 'chr14:200'.
     """
     if ":" not in region_notation:
         return region_notation, None
-    error_message = f"Invalid `region_notation`: {region_notation!r}"
     try:
         sequence_name, coordinate_str = region_notation.split(":")
         start_str, end_str = coordinate_str.split("-")
     except ValueError:
-        raise ValueError(error_message)
+        raise InvalidRegionNotationError(region_notation)
     if not sequence_name:
-        raise ValueError(error_message)
+        raise InvalidRegionNotationError(region_notation)
     start_str = "".join(x for x in start_str if x != ",")
     end_str = "".join(x for x in end_str if x != ",")
     if not start_str.isnumeric() or not end_str.isnumeric():
-        raise ValueError(error_message)
+        raise InvalidRegionNotationError(region_notation)
     start, end = int(start_str) - 1, int(end_str)
     return sequence_name, (start, end)
 
 
 def normalize_region_notation(region_notation: str) -> str:
     """
-    Normalize ``region_notation`` to be samtools-compatible. Commas are removed from the coordinates.
+    Normalize ``region_notation`` to be samtools-compatible. Spaces are removed. Commas are removed from the coordinates.
 
-    :raises ValueError: if `region_notation` is not correctly formatted
+    :raises RegionNotationError: if `region_notation` is not correctly formatted
 
     >>> normalize_region_notation("chr14:104,586,347-107,043,718")
     'chr14:104586347-107043718'
+    >>> normalize_region_notation("chrX: 26,23,922 - 26,235,150")
+    'chrX:2623922-26235150'
     >>> normalize_region_notation("chr14")
     'chr14'
     """
-    sequence_name, interval = parse_region_notation(region_notation)
+    sequence_name, interval = parse_region_notation(
+        region_notation.replace(" ", "").replace("\t", "")
+    )
     return get_region_notation(sequence_name, interval)
+
+
+class InvalidRegionNotationError(TypeError):
+    """Exception raised for invalid region of interest format."""
+
+    def __init__(self, region: Any):
+        message = f"Unable to parse region: {region!r}."
+        super().__init__(message)
