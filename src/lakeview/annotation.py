@@ -209,6 +209,8 @@ class GeneAnnotation:
         transcript_features: Iterable[str] = ["transcript"],
         exon_features: Iterable[str] = ["exon"],
         cds_features: Iterable[str] = ["CDS"],
+        transcript_key: str = "transcript_id", # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str = "transcript_id", # Fetch the parent transcript_id from a exon/CDS record
     ):
         # Combine features
         features: set[str] = (
@@ -235,21 +237,10 @@ class GeneAnnotation:
             )
         if not records:
             warnings.warn("No annotation records have been loaded.")
-        # Parse gene_key and transcript_key
-        transcript_key: str  # Fetch the transcript_id from a transcript record
-        parent_transcript_key: str  # Fetch the parent transcript_id from a exon/CDS record
-        gene_key: str  # Fetch the gene_id from a gene record. Reserved for future use
-        parent_gene_key: str  # Fetch the parent gene_id from a transcript record
-        if format_ == "gtf":
-            transcript_key = "transcript_id"
-            parent_transcript_key = "transcript_id"
-            # gene_key = "gene_id"
-            # parent_gene_key = "gene_id"
-        elif format_ == "gff3":
-            transcript_key = "ID"
-            parent_transcript_key = "Parent"
-            # gene_key = "ID"
-            # parent_gene_key = "Parent"
+
+        
+
+
         # Identify genes, transcripts, exons, cdss
         genes, transcripts, exons, cdss = [], [], [], []
         for record in records:
@@ -287,7 +278,25 @@ class GeneAnnotation:
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],
         region: str | tuple[str, tuple[int, int]] | tuple[str, None],
-    ):
+    ):  
+        # Parse gene_key and transcript_key
+        # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications; 
+        # the rules below only apply to GENCODE/RefSeq
+        transcript_key: str  # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str  # Fetch the parent transcript_id from a exon/CDS record
+        # gene_key: str  # Fetch the gene_id from a gene record. Reserved for future use
+        # parent_gene_key: str  # Fetch the parent gene_id from a transcript record
+        if format_ == "gtf":
+            transcript_key = "transcript_id"
+            parent_transcript_key = "transcript_id"
+            # gene_key = "gene_id"
+            # parent_gene_key = "gene_id"
+        elif format_ == "gff3":
+            transcript_key = "ID"
+            parent_transcript_key = "Parent"
+            # gene_key = "ID"
+            # parent_gene_key = "Parent"
+            
         instance = cls.from_file(
             file=file,
             region=region,
@@ -296,6 +305,8 @@ class GeneAnnotation:
             transcript_features=["transcript"],
             exon_features=["exon"],
             cds_features=["CDS"],
+            transcript_key=transcript_key,
+            parent_transcript_key=parent_transcript_key
         )
         # Parse gene names
         for transcript in instance.transcripts:
@@ -308,7 +319,25 @@ class GeneAnnotation:
         file: str | TextIO,
         format_: Literal["gtf", "gff3"],
         region: str | tuple[str, tuple[int, int]] | tuple[str, None],
-    ):
+    ):  
+        # Parse gene_key and transcript_key
+        # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications; 
+        # the rules below only apply to GENCODE/RefSeq
+        transcript_key: str  # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str  # Fetch the parent transcript_id from a exon/CDS record
+        # gene_key: str  # Fetch the gene_id from a gene record. Reserved for future use
+        # parent_gene_key: str  # Fetch the parent gene_id from a transcript record
+        if format_ == "gtf":
+            transcript_key = "transcript_id"
+            parent_transcript_key = "transcript_id"
+            # gene_key = "gene_id"
+            # parent_gene_key = "gene_id"
+        elif format_ == "gff3":
+            transcript_key = "ID"
+            parent_transcript_key = "Parent"
+            # gene_key = "ID"
+            # parent_gene_key = "Parent"
+
         instance = cls.from_file(
             file=file,
             region=region,
@@ -324,6 +353,8 @@ class GeneAnnotation:
             transcript_features=["transcript", "mRNA"],
             exon_features=["exon"],
             cds_features=["CDS"],
+            transcript_key=transcript_key,
+            parent_transcript_key=parent_transcript_key
         )
         # Parse gene names
         for transcript in instance.transcripts:
@@ -353,7 +384,7 @@ class GeneAnnotation:
             labels = [labels(g) for g in genes]
         return labels, colors
 
-    def draw_genes(
+    def draw_genes( # TODO: delete or update
         self,
         ax: Axes,
         *,
