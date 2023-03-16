@@ -9,6 +9,7 @@ from typing import (
     Optional,
     Union,
     Literal,
+    Any
 )
 from collections.abc import (
     Iterable,
@@ -506,7 +507,7 @@ class AlignedSegment:
     @property
     def _pair_identifier(self) -> str:
         query_name = self.query_name
-        if query_name[-2:] in ('/1', '/2', '-1', '-2'):
+        if query_name[-2:] in ("/1", "/2", "-1", "-2"):
             return query_name[:-2]
         return query_name
 
@@ -643,7 +644,9 @@ class SequenceAlignment:
         with pysam.AlignmentFile(
             file_path, mode="rb", require_index=True, **kw
         ) as alignment_file:
-            return cls._from_pysam(alignment_file, region=region, load_pileup=load_pileup)
+            return cls._from_pysam(
+                alignment_file, region=region, load_pileup=load_pileup
+            )
 
     @classmethod
     def from_remote(
@@ -674,7 +677,9 @@ class SequenceAlignment:
                 with pysam.AlignmentFile(
                     url, mode="rb", require_index=True, index_filename=index_url, **kw
                 ) as alignment_file:
-                    return cls._from_pysam(alignment_file, region=region, load_pileup=load_pileup)
+                    return cls._from_pysam(
+                        alignment_file, region=region, load_pileup=load_pileup
+                    )
             finally:
                 os.chdir(workdir)
 
@@ -1203,6 +1208,11 @@ class SequenceAlignment:
         marker_xs: list[float] = []
         marker_ys: list[float] = []
         marker_colors: list[Color] = []
+        monocolor: Color | None
+        if len(set(colors)) == 1:
+            monocolor = colors[0]
+        else:
+            monocolor = None
         for seg, y, color in zip(segments, offsets, colors):
             for block_start, block_end in seg._get_normalized_blocks():
                 start_point = (block_start - 0.5, y)
@@ -1211,38 +1221,41 @@ class SequenceAlignment:
                 line_colors.append(color)
                 marker_xs.append((block_start + block_end) / 2 - 0.5)
                 marker_ys.append(y)
+
         ax.add_collection(
             LineCollection(
                 lines,
                 linewidths=height,
-                colors=colors[0] if len(set(colors)) == 1 else line_colors,
+                colors=monocolor if monocolor is not None else line_colors,
                 zorder=0,
                 facecolors="none",
             )
         )
+        
         MARKER_ZORDER = 0.05
-        if len(set(marker_colors)) == 1:
-            ax.plot(
-                marker_xs,
-                marker_ys,
+        scatter_kw: Mapping[str, Any]
+        if monocolor is not None:
+            scatter_kw = dict(
                 marker=MARKER,
-                markersize=height,
-                color=marker_colors[0],
-                linestyle="",
-                markeredgewidth=markeredgewidth,
+                s=height**2,
+                facecolor=monocolor,
+                edgecolor=monocolor,
+                linewidth=markeredgewidth,
                 zorder=MARKER_ZORDER,
             )
         else:
-            ax.scatter(
-                marker_xs,
-                marker_ys,
-                c=marker_colors,
+            scatter_kw = dict(
                 marker=MARKER,
                 s=height**2,
+                c=marker_colors,
                 linewidth=markeredgewidth,
                 zorder=MARKER_ZORDER,
-                **kw,
             )
+        ax.scatter(
+            marker_xs,
+            marker_ys,
+            **{**scatter_kw, **kw},
+        )
 
     def _draw_arrowheads(
         self,
@@ -1786,7 +1799,7 @@ class SequenceAlignment:
         edgecolor: Color = "none",
         linewidth: float = 1,
         **kw,
-    ):  
+    ):
         if self.pileup_depths is None:
             raise RuntimeError("Pileup data was not loaded.")
         window_centers, mean_depths = self._get_mean_depths_per_window(
