@@ -205,7 +205,7 @@ class GenomeViewer:
         self.axes[-1].set_xlabel(*args, **kw)
 
     def set_title(self, *args, **kw) -> mpl.text.Text:
-        self.axes[-1].set_title(*args, **kw)
+        self.axes[0].set_title(*args, **kw)
 
     def savefig(self, *args, dpi=300, bbox_inches="tight", **kw):
         return self.figure.savefig(*args, dpi=300, bbox_inches=bbox_inches, **kw)
