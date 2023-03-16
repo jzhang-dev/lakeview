@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, Union, Callable, Literal, TextIO, TypeVar
 from collections.abc import Iterable, Sequence, Mapping, Container
 from dataclasses import dataclass, field, asdict
-import warnings
+from warnings import warn
 from math import floor
 import numpy as np
 from matplotlib.collections import LineCollection
@@ -14,7 +14,7 @@ from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,
-    InvalidRegionNotationError
+    InvalidRegionNotationError,
 )
 from .plot import get_ax_size
 from ._layout import key_filter, key_sort, pack_intervals
@@ -108,7 +108,7 @@ class GeneAnnotation:
         file_object: TextIO,
         region: Region,
         *,
-        format_: Literal["gtf", "gff", "gff3"],
+        format_: Literal["gtf", "gff3"] = "gff3",
         features: Container[str],
     ) -> Sequence[AnnotationRecord]:
         # Parse region
@@ -132,6 +132,10 @@ class GeneAnnotation:
         # Ref: https://mblab.wustl.edu/GTF22.html
         # Ref: https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
         if format_ == "gtf":
+            warn(
+                "The GTF format is deprecated. Lakeview currently provides limited support for GTF files which may be removed in future versions. Please use the GFF3 format (http://gmod.org/wiki/GFF3) instead.",
+                DeprecationWarning,
+            )
             attr_kw = dict(
                 field_separator="; ",
                 key_value_separator=" ",
@@ -151,9 +155,8 @@ class GeneAnnotation:
             )
         else:
             raise ValueError(
-                f"Invalid value for `format_`: {format!r}. Expecting one of ('gtf', 'gff3')."
+                f"Invalid value for `format_`: {format_!r}. Expecting one of ('gtf', 'gff3')."
             )
-
 
         records: list[AnnotationRecord] = []
         visited_sequence_names: set[str] = set()
@@ -193,23 +196,30 @@ class GeneAnnotation:
                     attributes=attr_dict,
                 )
             )
-        if len(records) == 0 and sequence_name is not None and sequence_name not in visited_sequence_names:
-            raise ValueError(f"Invalid sequence name: {sequence_name!r}. Found following sequence names in the file: {visited_sequence_names!r}")
+        if (
+            len(records) == 0
+            and sequence_name is not None
+            and sequence_name not in visited_sequence_names
+        ):
+            raise ValueError(
+                f"Invalid sequence name: {sequence_name!r}. Found following sequence names in the file: {visited_sequence_names!r}"
+            )
         return records
 
     @classmethod
     def from_file(
         cls,
         file: str | TextIO,
-        format_: Literal["gtf", "gff3"],
         region: Region,
         *,
+        format_: Literal["gtf", "gff3"] = "gff3",
         gene_features: Iterable[str] = ["gene"],
         transcript_features: Iterable[str] = ["transcript"],
         exon_features: Iterable[str] = ["exon"],
         cds_features: Iterable[str] = ["CDS"],
-        transcript_key: str = "transcript_id", # Fetch the transcript_id from a transcript record
-        parent_transcript_key: str = "transcript_id", # Fetch the parent transcript_id from a exon/CDS record
+        transcript_key: str = "transcript_id",  # Fetch the transcript_id from a transcript record
+        parent_transcript_key: str
+        | None = None,  # Fetch the parent transcript_id from a exon/CDS record
     ):
         # Combine features
         features: set[str] = (
@@ -235,12 +245,16 @@ class GeneAnnotation:
                 features=features,
             )
         if not records:
-            warnings.warn("No annotation records have been loaded.")
-
-        
-
+            warn("No annotation records have been loaded.")
 
         # Identify genes, transcripts, exons, cdss
+        if parent_transcript_key is None:
+            if format_ == "gff3":
+                parent_transcript_key = "Parent"
+            elif format_ == "gtf":
+                parent_transcript_key = transcript_key
+            else:
+                raise ValueError(f"Invalid value for `format_`: {format_!r}")
         genes, transcripts, exons, cdss = [], [], [], []
         for record in records:
             if record.feature in gene_features:
@@ -275,11 +289,12 @@ class GeneAnnotation:
     def from_gencode(
         cls,
         file: str | TextIO,
-        format_: Literal["gtf", "gff3"],
         region: Region,
-    ):  
+        *,
+        format_: Literal["gtf", "gff3"] = "gff3",
+    ):
         # Parse gene_key and transcript_key
-        # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications; 
+        # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications;
         # the rules below only apply to GENCODE/RefSeq
         transcript_key: str  # Fetch the transcript_id from a transcript record
         parent_transcript_key: str  # Fetch the parent transcript_id from a exon/CDS record
@@ -295,7 +310,9 @@ class GeneAnnotation:
             parent_transcript_key = "Parent"
             # gene_key = "ID"
             # parent_gene_key = "Parent"
-            
+        else:
+            raise ValueError(f"Invalid value for `format_`: {format_!r}.")
+
         instance = cls.from_file(
             file=file,
             region=region,
@@ -305,7 +322,7 @@ class GeneAnnotation:
             exon_features=["exon"],
             cds_features=["CDS"],
             transcript_key=transcript_key,
-            parent_transcript_key=parent_transcript_key
+            parent_transcript_key=parent_transcript_key,
         )
         # Parse gene names
         for transcript in instance.transcripts:
@@ -316,11 +333,12 @@ class GeneAnnotation:
     def from_refseq(
         cls,
         file: str | TextIO,
-        format_: Literal["gtf", "gff3"],
         region: Region,
-    ):  
+        *,
+        format_: Literal["gtf", "gff3"] = "gff3",
+    ):
         # Parse gene_key and transcript_key
-        # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications; 
+        # transcript_key and parent_transcript_key appear not part of GFF3/GTF specifications;
         # the rules below only apply to GENCODE/RefSeq
         transcript_key: str  # Fetch the transcript_id from a transcript record
         parent_transcript_key: str  # Fetch the parent transcript_id from a exon/CDS record
@@ -336,6 +354,10 @@ class GeneAnnotation:
             parent_transcript_key = "Parent"
             # gene_key = "ID"
             # parent_gene_key = "Parent"
+        else:
+            raise ValueError(
+                f"Invalid value for `format_`: {format!r}."
+            )
 
         instance = cls.from_file(
             file=file,
@@ -353,7 +375,7 @@ class GeneAnnotation:
             exon_features=["exon"],
             cds_features=["CDS"],
             transcript_key=transcript_key,
-            parent_transcript_key=parent_transcript_key
+            parent_transcript_key=parent_transcript_key,
         )
         # Parse gene names
         for transcript in instance.transcripts:
@@ -383,7 +405,7 @@ class GeneAnnotation:
             labels = [labels(g) for g in genes]
         return labels, colors
 
-    def draw_genes( # TODO: delete or update
+    def draw_genes(  # TODO: delete or update
         self,
         ax: Axes,
         *,
@@ -545,7 +567,7 @@ class GeneAnnotation:
             if sort_by is not None:
                 sort_keys = key_filter(sort_keys, filter_keys)
             if len(transcripts) == 0:
-                warnings.warn("All segments removed after filtering.")
+                warn("All segments removed after filtering.")
 
         if sort_by is not None:
             transcripts = key_sort(transcripts, sort_keys)
