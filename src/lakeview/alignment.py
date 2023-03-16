@@ -643,7 +643,7 @@ class SequenceAlignment:
         with pysam.AlignmentFile(
             file_path, mode="rb", require_index=True, **kw
         ) as alignment_file:
-            return cls._from_pysam(alignment_file, region=region)
+            return cls._from_pysam(alignment_file, region=region, load_pileup=load_pileup)
 
     @classmethod
     def from_remote(
@@ -674,7 +674,7 @@ class SequenceAlignment:
                 with pysam.AlignmentFile(
                     url, mode="rb", require_index=True, index_filename=index_url, **kw
                 ) as alignment_file:
-                    return cls._from_pysam(alignment_file, region=region)
+                    return cls._from_pysam(alignment_file, region=region, load_pileup=load_pileup)
             finally:
                 os.chdir(workdir)
 
