@@ -121,11 +121,19 @@ def scientific_notation(
 
 class PrunedMaxNLocator(MaxNLocator):
     """
-    A Matplotlib `tick locator <https://matplotlib.org/stable/api/ticker_api.html#tick-locating>`_ that avoids placing ticks near the edge of the plot.
+    A Matplotlib `tick locator <https://matplotlib.org/stable/api/ticker_api.html#tick-locating>`_ that prunes ticks near the edge of the plot.
     """
 
     def __init__(self, nbins: int = 4, prune: tuple[float, float] = (0.05, 0.05)):
-        self._prune_left, self._prune_right = prune
+        """
+        :param nbins: Maximum number of intervals; one less than max number of ticks.
+        :param prune: A two-element :py:class:`tuple` `(prune_lower, prune_upper)`. Ticks outside the interval [vmin + prune_lower × (vmax - vmin), vmax - self._prune_upper × (vmax - vmin)] will be pruned. See :py:meth:`.PrunedMaxNLocator.tick_values`.
+        """
+        prune_lower, prune_upper = prune
+        if not (0 <= prune_lower <= 1 and 0 <= prune_upper <= 1):
+            raise ValueError("`prune` must be a pair of numbers between 0 and 1.")
+        self._prune_lower, self._prune_upper = prune_lower, prune_upper
+
         super().__init__(nbins=nbins, prune=None)
 
     def tick_values(self, vmin: float, vmax: float):
@@ -134,8 +142,8 @@ class PrunedMaxNLocator(MaxNLocator):
             vmin = -vmax
         vmin, vmax = mtransforms.nonsingular(vmin, vmax, expander=1e-13, tiny=1e-14)
         locs = self._raw_ticks(vmin, vmax)
-        min_tick_location = vmin + self._prune_left * (vmax - vmin)
-        max_tick_location = vmax - self._prune_right * (vmax - vmin)
+        min_tick_location = vmin + self._prune_lower * (vmax - vmin)
+        max_tick_location = vmax - self._prune_upper * (vmax - vmin)
         locs = [x for x in locs if min_tick_location <= x <= max_tick_location]
         return self.raise_if_exceeds(locs)
 
