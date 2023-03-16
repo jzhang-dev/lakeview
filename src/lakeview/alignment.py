@@ -503,19 +503,12 @@ class AlignedSegment:
         """
         return self._cigar.reference_skips
 
-    @functools.cached_property
-    def _pair_identifier(self) -> tuple[int, int] | None:
-        if self.wrapped.mate_is_unmapped:  # Mate is not mapped
-            return None
-        if (
-            self.wrapped.reference_id != self.wrapped.next_reference_id
-        ):  # Mate is mapped to another reference sequence
-            return None
-        self_reference_start: int = self.reference_start
-        mate_reference_start: int = self.wrapped.next_reference_start
-        min_reference_start: int = min([self_reference_start, mate_reference_start])
-        max_reference_start: int = max([self_reference_start, mate_reference_start])
-        return (min_reference_start, max_reference_start)
+    @property
+    def _pair_identifier(self) -> str:
+        query_name = self.query_name
+        if query_name[-2:] in ('/1', '/2', '-1', '-2'):
+            return query_name[:-2]
+        return query_name
 
 
 @dataclass
@@ -862,16 +855,9 @@ class SequenceAlignment:
         elif isinstance(link_by, str):
             if link_by == "pair":
                 link_identifiers = []
-                link_id: tuple[int, int]
+                link_id: str
                 for i, segment in enumerate(segments):
-                    pair_id = segment._pair_identifier
-                    if pair_id is None:
-                        link_id = (
-                            -i - 1,
-                            -i - 1,
-                        )  # Arbitrary id to make sure non-paired reads are not linked together
-                    else:
-                        link_id = pair_id
+                    link_id = segment._pair_identifier
                     link_identifiers.append(link_id)
             elif link_by == "name":
                 link_identifiers = [seg.query_name for seg in segments]

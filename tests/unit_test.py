@@ -94,7 +94,7 @@ def test_link_segments() -> None:
     # Link by read pair
     link_identifiers = p._get_link_identifiers(link_by="pair")
     c = collections.Counter(link_identifiers)
-    assert len(c) == 193
+    assert len(c) == 184
 
 
 def test_sort_segments() -> None:
