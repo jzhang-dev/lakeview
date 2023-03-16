@@ -237,3 +237,4 @@ def test_dot_plot():
     # TODO: add a microsatellite region to demonstrate StainedGlass-style plot
     fig.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
+
