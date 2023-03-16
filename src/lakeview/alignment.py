@@ -4,13 +4,7 @@
 """Test docstring for annotation.py"""
 
 from __future__ import annotations
-from typing import (
-    Callable,
-    Optional,
-    Union,
-    Literal,
-    Any
-)
+from typing import Callable, Optional, Union, Literal, Any
 from collections.abc import (
     Iterable,
     Sequence,
@@ -1207,7 +1201,6 @@ class SequenceAlignment:
         line_colors: list[Color] = []
         marker_xs: list[float] = []
         marker_ys: list[float] = []
-        marker_colors: list[Color] = []
         monocolor: Color | None
         if len(set(colors)) == 1:
             monocolor = colors[0]
@@ -1218,10 +1211,12 @@ class SequenceAlignment:
                 start_point = (block_start - 0.5, y)
                 end_point = (block_end - 0.5, y)
                 lines.append((start_point, end_point))
-                line_colors.append(color)
                 marker_xs.append((block_start + block_end) / 2 - 0.5)
                 marker_ys.append(y)
+                if monocolor is None:
+                    line_colors.append(color)
 
+        # Backbones
         ax.add_collection(
             LineCollection(
                 lines,
@@ -1229,9 +1224,11 @@ class SequenceAlignment:
                 colors=monocolor if monocolor is not None else line_colors,
                 zorder=0,
                 facecolors="none",
+                **kw,
             )
         )
-        
+
+        # Markers to prevent backbones from disappearing when zoomed out
         MARKER_ZORDER = 0.05
         scatter_kw: Mapping[str, Any]
         if monocolor is not None:
@@ -1247,14 +1244,14 @@ class SequenceAlignment:
             scatter_kw = dict(
                 marker=MARKER,
                 s=height**2,
-                c=marker_colors,
+                c=line_colors,
                 linewidth=markeredgewidth,
                 zorder=MARKER_ZORDER,
             )
         ax.scatter(
             marker_xs,
             marker_ys,
-            **{**scatter_kw, **kw},
+            **scatter_kw,
         )
 
     def _draw_arrowheads(
