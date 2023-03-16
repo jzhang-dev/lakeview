@@ -9,11 +9,10 @@ from warnings import warn
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.transforms import Bbox
-from matplotlib.ticker import MaxNLocator
 from IPython.display import display
 import ipywidgets
 from ._type_alias import Figure, Axes
-from .plot import BasePairFormatter
+from .plot import BasePairFormatter, PrunedMaxNLocator
 
 
 class _GenomeViewerWidget:
@@ -77,10 +76,10 @@ class _GenomeViewerWidget:
         display(self.app)
 
     def get_xlim(self) -> tuple[float, float]:
-        return self.axes[0].get_xlim()
+        return self.axes[-1].get_xlim()
 
     def set_xlim(self, *args, **kw) -> tuple[float, float]:
-        return self.axes[0].set_xlim(*args, **kw)
+        return self.axes[-1].set_xlim(*args, **kw)
 
     def _zoom(self, scale: float, /) -> None:
         for ax in self.figure.axes:
@@ -118,17 +117,12 @@ class _GenomeViewerWidget:
         self.set_xlim(self._initial_xlim)
         self._update_display()
 
-    def _update_xaxis_ticklabels(self) -> None:
-        formatter = BasePairFormatter.from_limits(self.get_xlim())
-        self.axes[-1].xaxis.set_major_formatter(formatter)
-
     def _update_region_text(self) -> None:
         start, end = self.get_xlim()
         self._region_text.value = f"{int(start):,} - {int(end):,}"
 
     def _update_display(self):
         self._update_region_text()
-        self._update_xaxis_ticklabels()
         self._center_widget.clear_output(wait=True)
         with self._center_widget:
             display(self.figure)
@@ -143,11 +137,8 @@ class GenomeViewer:
         self,
         tracks: int = 1,
         *,
-        height_ratios: Optional[Sequence[float]] = None,
         figsize: tuple[float, float] = (8, 8),
-        xlim: tuple[float, float] | None = None,
-        use_tick_formatter: bool = True,
-        use_tick_locator: bool = True,
+        height_ratios: Optional[Sequence[float]] = None,
         constrained_layout: bool = True,
         figure_kw=dict(),
     ) -> None:
@@ -164,7 +155,8 @@ class GenomeViewer:
                 constrained_layout=constrained_layout,
                 **figure_kw,
             )
-            fig.get_layout_engine().set(w_pad=0.3)
+            horizontal_padding = 0.2
+            fig.get_layout_engine().set(w_pad=horizontal_padding)
 
             # Create a hidden Axes that is as wide as the Figure and has no height
             # This prevents the Figure from resizing when changing xlim interactively
@@ -174,11 +166,8 @@ class GenomeViewer:
         self._figure = fig
         self._axes = axes[:, 0]
         self._widget: _GenomeViewerWidget | None = None
-        self._use_tick_formatter: bool = use_tick_formatter
-        if use_tick_locator:
-            self.axes[-1].xaxis.set_major_locator(MaxNLocator(3))
-        if xlim is not None:
-            self.set_xlim(xlim)
+        self.axes[-1].xaxis.set_major_locator(PrunedMaxNLocator(4, prune=(0.05, 0.05)))
+        self.axes[-1].xaxis.set_major_formatter(BasePairFormatter('bp', 0, show_suffix=False))
 
     @property
     def figure(self) -> Figure:
@@ -200,24 +189,23 @@ class GenomeViewer:
         return self.axes[-1].xaxis
 
     def set_xlim(self, *args, **kw) -> tuple[float, float]:
-        start, end = self.axes[0].set_xlim(*args, **kw)
-        if self._use_tick_formatter:
-            formatter = BasePairFormatter.from_limits(self.get_xlim())
-            self.axes[-1].xaxis.set_major_formatter(formatter)
+        start, end = self.axes[-1].set_xlim(*args, **kw)
         return start, end
 
     def get_xlim(self) -> tuple[float, float]:
-        return self.axes[0].get_xlim()
+        return self.axes[-1].get_xlim()
 
-    def use_base_pair_formatter(self) -> None:
-        formatter = BasePairFormatter.from_limits(self.get_xlim())
+    def set_major_formatter(self, formatter: mpl.ticker.Formatter) -> None:
         self.axes[-1].xaxis.set_major_formatter(formatter)
+
+    def set_minor_formatter(self, formatter: mpl.ticker.Formatter) -> None:
+        self.axes[-1].xaxis.set_minor_formatter(formatter)
 
     def set_xlabel(self, *args, **kw) -> mpl.text.Text:
         self.axes[-1].set_xlabel(*args, **kw)
 
     def set_title(self, *args, **kw) -> mpl.text.Text:
-        self.axes[0].set_title(*args, **kw)
+        self.axes[-1].set_title(*args, **kw)
 
     def savefig(self, *args, dpi=300, bbox_inches="tight", **kw):
         return self.figure.savefig(*args, dpi=300, bbox_inches=bbox_inches, **kw)

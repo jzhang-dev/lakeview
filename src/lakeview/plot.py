@@ -9,12 +9,13 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex
+from matplotlib.ticker import MaxNLocator
+from matplotlib import transforms as mtransforms
 from ._type_alias import Color, Point, Axes
 
 
 # Type alias
 BasePairUnit = Literal["bp", "kb", "Mb", "Gb", "Tb"]
-
 
 
 def get_cmap_colors(
@@ -35,7 +36,9 @@ def get_cmap_colors(
     elif format_ == "hex":
         colors = [rgb2hex(c) for c in colors]
     else:
-        raise ValueError(f"Invalid value for `format_`: {format_}. Expecting one of {'rgb', 'hex'}")
+        raise ValueError(
+            f"Invalid value for `format_`: {format_}. Expecting one of {'rgb', 'hex'}"
+        )
     return colors
 
 
@@ -114,6 +117,27 @@ def scientific_notation(
     # Format with mathtext
     s = quote + coefficient + r"\times 10^" + "{" + exponent + "}" + quote
     return s
+
+
+class PrunedMaxNLocator(MaxNLocator):
+    """
+    A Matplotlib `tick locator <https://matplotlib.org/stable/api/ticker_api.html#tick-locating>`_ that avoids placing ticks near the edge of the plot.
+    """
+
+    def __init__(self, nbins: int = 4, prune: tuple[float, float] = (0.05, 0.05)):
+        self._prune_left, self._prune_right = prune
+        super().__init__(nbins=nbins, prune=None)
+
+    def tick_values(self, vmin: float, vmax: float):
+        if self._symmetric:
+            vmax = max(abs(vmin), abs(vmax))
+            vmin = -vmax
+        vmin, vmax = mtransforms.nonsingular(vmin, vmax, expander=1e-13, tiny=1e-14)
+        locs = self._raw_ticks(vmin, vmax)
+        min_tick_location = vmin + self._prune_left * (vmax - vmin)
+        max_tick_location = vmax - self._prune_right * (vmax - vmin)
+        locs = [x for x in locs if min_tick_location <= x <= max_tick_location]
+        return self.raise_if_exceeds(locs)
 
 
 @dataclass(init=False)
