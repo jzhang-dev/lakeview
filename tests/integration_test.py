@@ -197,7 +197,7 @@ def test_SNURF_methylation():
     CHROMOSOME = "chr15"
     PACBIO_BAM_PATH = "tests/data/HG002_GRCh38_SNURF_haplotagged.bam"
     OUTPUT_PNG_PATH = "tests/output/SNURF_methylation.png"
-    p = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, CHROMOSOME)
+    p = lv.SequenceAlignment.from_file(PACBIO_BAM_PATH, CHROMOSOME, load_pileup=False)
     fig, ax = plt.subplots(figsize=(8, 5))
     p.draw_alignment(
         ax,

@@ -35,7 +35,7 @@ from .region_notation import (
     parse_region_notation,
     normalize_region_notation,
     get_region_notation,
-    InvalidRegionNotationError
+    InvalidRegionNotationError,
 )
 from ._type_alias import (
     Identifier,
@@ -463,7 +463,7 @@ class AlignedSegment:
     @functools.cached_property
     def modified_bases(self) -> list[ModifiedBase]:
         "modified bases identified from the Ml and Mm tags; see :external:attr:`pysam.AlignedSegment.modified_bases`"
-        if self.wrapped.modified_bases is None: # type: ignore # modified_bases is not correctly typed 
+        if self.wrapped.modified_bases is None:  # type: ignore # modified_bases is not correctly typed
             return []
         modified_bases = []
         for (
@@ -473,7 +473,7 @@ class AlignedSegment:
                 modification,
             ),
             data,
-        ) in self.wrapped.modified_bases.items(): # type: ignore # modified_bases is not correctly typed 
+        ) in self.wrapped.modified_bases.items():  # type: ignore # modified_bases is not correctly typed
             strand = {0: "+", 1: "-"}[strand]
             for pos, qual in data:
                 if qual == -1:
@@ -545,17 +545,17 @@ class SequenceAlignment:
     .. note::
        For advanced users, it is possible to modify this attribute prior to plotting to apply complex filtering/sorting operations.
     """
-    pileup_depths: dict[int, int]
+    pileup_depths: dict[int, int] | None
     """A dict mapping reference positions to pileup depths."""
-    pileup_bases: dict[int, collections.Counter[str]]
+    pileup_bases: dict[int, collections.Counter[str]] | None
     """A dict mapping reference positions to a counter, which in turn maps each base to its count."""
 
     def __init__(
         self,
         reference_name: str,
         segments: list[AlignedSegment],
-        pileup_depths: dict[int, int],
-        pileup_bases: dict[int, collections.Counter[str]],
+        pileup_depths: dict[int, int] | None,
+        pileup_bases: dict[int, collections.Counter[str]] | None,
     ):
         self.segments: list[AlignedSegment] = [seg for seg in segments if seg.is_mapped]
         self.pileup_depths = pileup_depths
@@ -567,6 +567,8 @@ class SequenceAlignment:
         cls,
         alignment_file: pysam.AlignmentFile,
         region: str | tuple[str, tuple[float, float]] | tuple[str, None],
+        *,
+        load_pileup: bool = True,
     ):
         # Parse region
         reference_name: str
@@ -595,20 +597,26 @@ class SequenceAlignment:
         if not segment_list:
             raise ValueError(f"No aligned segments found in {normalized_region!r}.")
         # Load pileup
-        pileup_depths: dict[int, int] = {}
-        pileup_bases: dict[int, collections.Counter[str]] = {}
-        pileup_column: pysam.PileupColumn
-        for pileup_column in alignment_file.pileup(region=normalized_region):
-            position: int = pileup_column.reference_pos
-            query_bases: list[str] = [
-                b.upper() for b in pileup_column.get_query_sequences() if b
-            ]
-            pileup_depths[position] = len(
-                query_bases
-            )  # col.nsegments includes reference skips; use len(query_bases) instead
-            base_counter = collections.Counter(query_bases)
-            if len(base_counter) > 1:
-                pileup_bases[position] = base_counter
+        pileup_depths: dict[int, int] | None
+        pileup_bases: dict[int, collections.Counter[str]] | None
+        if load_pileup:
+            pileup_depths = {}
+            pileup_bases = {}
+            pileup_column: pysam.PileupColumn
+            for pileup_column in alignment_file.pileup(region=normalized_region):
+                position: int = pileup_column.reference_pos
+                query_bases: list[str] = [
+                    b.upper() for b in pileup_column.get_query_sequences() if b
+                ]
+                pileup_depths[position] = len(
+                    query_bases
+                )  # col.nsegments includes reference skips; use len(query_bases) instead
+                base_counter = collections.Counter(query_bases)
+                if len(base_counter) > 1:
+                    pileup_bases[position] = base_counter
+        else:
+            pileup_depths = None
+            pileup_bases = None
         return cls(
             reference_name=reference_name,
             segments=segment_list,
@@ -621,6 +629,8 @@ class SequenceAlignment:
         cls,
         file_path: str,  # Pysam does not support reading and writing from true python file objects. See https://pysam.readthedocs.io/en/latest/usage.html#using-streams
         region: str | tuple[str, tuple[float, float]] | tuple[str, None],
+        *,
+        load_pileup: bool = True,
         **kw,
     ):
         """
@@ -634,6 +644,7 @@ class SequenceAlignment:
 
         :param file_path: Path to the BAM file.
         :param region: region to load alignment records from. See :py:mod:`lakeview.region_notation` for additional details.
+        :param load_pileup: Whether to load pileup data.
         :param kw: Keyword arguments passed to :external:class:`pysam.AlignmentFile`.
         """
         with pysam.AlignmentFile(
@@ -648,6 +659,7 @@ class SequenceAlignment:
         region: str | tuple[str, tuple[float, float]] | tuple[str, None],
         *,
         index_url: str | None = None,
+        load_pileup: bool = True,
         **kw,
     ):
         """
@@ -659,6 +671,7 @@ class SequenceAlignment:
         :param url: URL to the remote BAM file
         :param region: region to load alignment records from. See :py:mod:`lakeview.region_notation` for additional details.
         :param index_url: URL to the remote BAM index (.bai) file. The default is ``url + '.bai'``
+        :param load_pileup: Whether to load pileup data.
         :param kw: keyword arguments passed to :external:class:`pysam.AlignmentFile`
         """
         workdir = os.getcwd()
@@ -1719,6 +1732,8 @@ class SequenceAlignment:
         :param pileup_kw: Keyword arguments passed to :external:meth:`matplotlib.axes.Axes.fill_between`.
         :param mismatch_kw: Keyword arguments passed to :external:meth:`matplotlib.axes.Axes.bar`.
         """
+        if self.pileup_depths is None:
+            raise RuntimeError("Pileup data was not loaded.")
         self._draw_pileup_fill(ax, window_size=window_size, **pileup_kw)
         if show_mismatches:
             self._draw_pileup_mismatches(
@@ -1785,7 +1800,9 @@ class SequenceAlignment:
         edgecolor: Color = "none",
         linewidth: float = 1,
         **kw,
-    ):
+    ):  
+        if self.pileup_depths is None:
+            raise RuntimeError("Pileup data was not loaded.")
         window_centers, mean_depths = self._get_mean_depths_per_window(
             self.pileup_depths, self.pileup_depths.values(), window_size=window_size
         )
