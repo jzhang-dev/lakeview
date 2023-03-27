@@ -238,3 +238,10 @@ def test_dot_plot():
     fig.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
 
+
+def test_bigwig():
+    BIGWIG_PATH = "tests/data/test.bigwig"
+    painter = lv.Wiggle.from_bigwig(BIGWIG_PATH, "1")
+    gv = lv.GenomeViewer(figsize=(8, 2))
+    painter.draw(gv.axes[0])
+    gv.savefig("tests/output/bigwig.png")

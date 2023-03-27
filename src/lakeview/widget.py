@@ -87,7 +87,7 @@ class _GenomeViewerWidget:
             center = sum(old_xlim) / 2
             radius = (old_xlim[1] - old_xlim[0]) / 2
             new_radius = radius * scale
-            new_xlim = (center - new_radius, center + new_radius)
+            new_xlim = (max(0, center - new_radius), center + new_radius)
             ax.set_xlim(new_xlim)
         self._update_display()
 
@@ -96,7 +96,7 @@ class _GenomeViewerWidget:
             old_xlim = ax.get_xlim()
             radius = (old_xlim[1] - old_xlim[0]) / 2
             new_xlim = (
-                old_xlim[0] + distance * radius,
+                max(0, old_xlim[0] + distance * radius),
                 old_xlim[1] + distance * radius,
             )
             ax.set_xlim(new_xlim)
