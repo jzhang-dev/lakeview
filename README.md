@@ -2,6 +2,7 @@
 
 # Lakeview
 
+[![PyPI version](https://badge.fury.io/py/lakeview.svg)](https://badge.fury.io/py/lakeview)
 [![pytest](https://github.com/jzhang-dev/lakeview/actions/workflows/run_pytest.yml/badge.svg)](https://github.com/jzhang-dev/lakeview/actions/workflows/run_pytest.yml)
 [![mypy](https://github.com/jzhang-dev/lakeview/actions/workflows/type_check_with_mypy.yml/badge.svg)](https://github.com/jzhang-dev/lakeview/actions/workflows/type_check_with_mypy.yml)
 
