@@ -580,7 +580,7 @@ class SequenceAlignment:
         segment_list: list[AlignedSegment] = [
             AlignedSegment(seg)
             for seg in alignment_file.fetch(region=normalized_region)
-            if seg.is_mapped
+            if seg.is_mapped # type: ignore # is_mapped is not included in pysam type stub
         ]
         if not segment_list:
             raise ValueError(f"No aligned segments found in {normalized_region!r}.")
@@ -591,7 +591,7 @@ class SequenceAlignment:
             pileup_depths = {}
             pileup_bases = {}
             pileup_column: pysam.PileupColumn
-            for pileup_column in alignment_file.pileup(region=normalized_region):
+            for pileup_column in alignment_file.pileup(region=normalized_region): # type: ignore # pileup is correctly typed in pysam type stub
                 position: int = pileup_column.reference_pos
                 query_bases: list[str] = [
                     b.upper() for b in pileup_column.get_query_sequences() if b
