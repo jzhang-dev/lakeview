@@ -38,9 +38,12 @@ class Wiggle:
         )
         intervals: list[tuple[int, int]] = []
         values: list[float] = []
-        for interval_start, interval_end, value in bigwig.intervals(
+        data: Sequence[tuple[int, int, float]] | None = bigwig.intervals(
             *bigwig_intervals_args
-        ):
+        )
+        if data is None: # No intervals found in the region
+            return intervals, values
+        for interval_start, interval_end, value in data:
             intervals.append((interval_start, interval_end))
             values.append(value)
         return intervals, values
@@ -56,6 +59,8 @@ class Wiggle:
 
     @cached_property
     def _data(self) -> tuple[Sequence[float], Sequence[float]]:
+        if len(self.intervals) == 0:
+            return [], []
         xs:list[float] = [self.intervals[0][0] - 0.5]
         ys:list[float] = [0]
         previous_end: int = self.intervals[0][0]
@@ -73,5 +78,7 @@ class Wiggle:
 
     def draw(self, ax: Axes, *, plot_kw={}) -> None:
         xs, ys = self._data
+        if len(xs) == 0:
+            return
         ax.plot(xs, ys, **plot_kw)
         ax.set_ylim(bottom=0)

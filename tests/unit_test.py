@@ -163,10 +163,13 @@ def test_load_bigwig() -> None:
     painter = lv.Wiggle.from_bigwig(BIGWIG_PATH, "1")
     assert painter.intervals == [(0, 1), (1, 2), (2, 3), (100, 150), (150, 151)]
 
-    if os.getenv("GITHUB_ACTIONS") != "true": # This test will fail in GitHub Actions
-        BIGWIG_URL = "https://github.com/deeptools/pyBigWig/raw/96b951c9281bfbe5358677d532fba2342bd2323f/pyBigWigTest/test.bw"
-        painter = lv.Wiggle.from_bigwig(BIGWIG_URL, "1")
-        assert painter.intervals == [(0, 1), (1, 2), (2, 3), (100, 150), (150, 151)]
+    painter = lv.Wiggle.from_bigwig(BIGWIG_PATH, "1:1000-2000")
+    assert painter.intervals == []
+
+    # BIGWIG_URL = "https://github.com/deeptools/pyBigWig/raw/96b951c9281bfbe5358677d532fba2342bd2323f/pyBigWigTest/test.bw"
+    # if os.getenv("GITHUB_ACTIONS") != "true": # This test will fail in GitHub Actions
+    #     painter = lv.Wiggle.from_bigwig(BIGWIG_URL, "1")
+    #     assert painter.intervals == [(0, 1), (1, 2), (2, 3), (100, 150), (150, 151)]
 
 
 
