@@ -591,7 +591,7 @@ class SequenceAlignment:
             pileup_depths = {}
             pileup_bases = {}
             pileup_column: pysam.PileupColumn
-            for pileup_column in alignment_file.pileup(region=normalized_region): # type: ignore # pileup is correctly typed in pysam type stub
+            for pileup_column in alignment_file.pileup(region=normalized_region): # type: ignore # pileup is not correctly typed in pysam type stub
                 position: int = pileup_column.reference_pos
                 query_bases: list[str] = [
                     b.upper() for b in pileup_column.get_query_sequences() if b
