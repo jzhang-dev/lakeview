@@ -577,9 +577,13 @@ class SequenceAlignment:
                 f"Reference name {reference_name!r} is not found. Expecting one of {reference_names!r}"
             )
         # Load segments
+        fetch_kw: dict[str, Any] = dict(contig=reference_name)
+        if interval is not None:
+            fetch_kw['start'], fetch_kw['stop'] = interval
+
         segment_list: list[AlignedSegment] = [
             AlignedSegment(seg)
-            for seg in alignment_file.fetch(region=normalized_region)
+            for seg in alignment_file.fetch(**fetch_kw)
             if seg.is_mapped # type: ignore # is_mapped is not included in pysam type stub
         ]
         if not segment_list:

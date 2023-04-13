@@ -119,7 +119,7 @@ class _GenomeViewerWidget:
 
     def _update_region_text(self) -> None:
         start, end = self.get_xlim()
-        self._region_text.value = f"{int(start):,} - {int(end):,}"
+        self._region_text.value = f"{int(start):,}-{int(end):,}"
 
     def _update_display(self):
         self._update_region_text()
