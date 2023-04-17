@@ -1593,7 +1593,7 @@ class SequenceAlignment:
         offsets: Sequence[float],
         link_identifiers: Sequence[LinkIdentifier],
         *,
-        linewidth: float = 1.5,
+        linewidth: float = 1,
         color: Color = "lightgray",
         linestyle: str = "-",
         **kw,
