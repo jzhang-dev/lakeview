@@ -316,6 +316,9 @@ class AlignedSegment:
         else:
             raise ValueError("CIGAR not found.")
 
+    def __getattr__(self, name: str):
+        return getattr(self.wrapped, name)
+
     def has_tag(self, tag: str) -> bool:
         "alias of :external:py:meth:`pysam.AlignedSegment.has_tag`"
         return self.wrapped.has_tag(tag)
@@ -878,7 +881,7 @@ class SequenceAlignment:
         self,
         group_by: Callable[[AlignedSegment], GroupIdentifier]
         | Iterable[GroupIdentifier]
-        | Literal["haplotype", "name", "proper_pair", "strand"]
+        | Literal["name", "proper_pair", "strand"]
         | None,
     ) -> Sequence[GroupIdentifier]:
         segments = self.segments
@@ -888,12 +891,7 @@ class SequenceAlignment:
                 segments
             )  # Assign all segments into the same group
         if isinstance(group_by, str):
-            if group_by == "haplotype":
-                group_identifiers = [
-                    seg.get_tag("HP") if seg.has_tag("HP") else float("inf")
-                    for seg in segments
-                ]
-            elif group_by == "name":
+            if group_by == "name":
                 group_identifiers = [seg.query_name for seg in segments]
             elif group_by == "proper_pair":
                 group_identifiers = [seg.is_proper_pair for seg in segments]
@@ -945,7 +943,7 @@ class SequenceAlignment:
         | None = None,  # TODO: link by pair
         group_by: Callable[[AlignedSegment], GroupIdentifier]
         | Iterable[GroupIdentifier]
-        | Literal["haplotype", "name", "proper_pair", "strand"]
+        | Literal["name", "proper_pair", "strand"]
         | None = None,
         color_by: Callable[[AlignedSegment], Color]
         | Iterable[Color]
@@ -1081,9 +1079,6 @@ class SequenceAlignment:
                     "forward": "Forward strand",
                     "reverse": "Reverse strand",
                 }
-            elif group_by == "haplotype":
-                group_label_dict = {hp: f"Haplotype {hp}" for hp in group_identifiers}
-                group_label_dict[float("inf")] = "Haplotype unknown"
             else:
                 group_label_dict = {g: str(g) for g in unique_group_identifiers}
         elif callable(group_labels):

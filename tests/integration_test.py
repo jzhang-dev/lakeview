@@ -211,7 +211,8 @@ def test_SNURF_methylation():
     fig, ax = plt.subplots(figsize=(8, 5))
     p.draw_alignment(
         ax,
-        group_by="haplotype",
+        group_by=lambda segment: segment.get_tag("HP") if segment.has_tag("HP") else 3,
+        group_labels={1: "Haplotype 1", 2: "Haplotype 2", 3: "Haplotype unknown"},
         show_modified_bases=True,
         modified_bases_kw=dict(
             linewidth=1.5,
