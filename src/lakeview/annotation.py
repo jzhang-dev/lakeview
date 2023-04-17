@@ -355,9 +355,7 @@ class GeneAnnotation:
             # gene_key = "ID"
             # parent_gene_key = "Parent"
         else:
-            raise ValueError(
-                f"Invalid value for `format_`: {format!r}."
-            )
+            raise ValueError(f"Invalid value for `format_`: {format!r}.")
 
         instance = cls.from_file(
             file=file,
@@ -382,63 +380,53 @@ class GeneAnnotation:
             transcript.gene_name = transcript.attributes.get("gene")
         return instance
 
-    def _parse_runtime_parameters(  # TODO: delete?
+    def _parse_gene_parameters(
         self,
         *,
-        color_by,
-        label_by,
-    ):
+        color_by: Callable[[AnnotationRecord], Color] | Iterable[Color] | None,
+        label_by: Callable[[AnnotationRecord], str] | Iterable[str] | None,
+    ) -> tuple[Sequence[Color], Sequence[str]]:
         genes = self.genes
         # Colors
+        colors: Sequence[Color]
         if color_by is None:
             colors = ["b"] * len(genes)
+        elif callable(color_by):
+            colors = [color_by(g) for g in genes]
         elif isinstance(color_by, Iterable):
             colors = list(color_by)
-        elif isinstance(color_by, Callable):
-            colors = [color_by(g) for g in genes]
+        else:
+            raise ValueError()
+
         # Labels
-        if label_by == None:
+        labels: Sequence[str]
+        if label_by is None:
             labels = [""] * len(genes)
+        elif callable(label_by):
+            labels = [label_by(g) for g in genes]
         elif isinstance(label_by, Iterable):
             labels = list(label_by)
-        elif isinstance(label_by, Callable):
-            labels = [labels(g) for g in genes]
-        return labels, colors
+        else:
+            raise ValueError()
+        return colors, labels
 
-    def draw_genes(  # TODO: delete or update
+    def draw_genes(
         self,
         ax: Axes,
         *,
-        allow_overlaps=False,
-        group_by=None,  # TODO
-        group_labels=None,  # TODO
-        color_by: Union[
-            Callable[[AnnotationRecord], Color],  # TODO: define a color type
-            Iterable[Color],
-            None,
-        ] = None,
-        sort_by=None,  # TODO
-        label_by: Union[
-            Callable[[AnnotationRecord], str],
-            Iterable[str],
-            None,
-        ] = None,  # TODO: support label_by="name"
-        gene_height=None,
-        show_labels=True,
+        color_by: Callable[[AnnotationRecord], Color] | Iterable[Color] | None = None,
+        label_by: Callable[[AnnotationRecord], str] | Iterable[str] | None = None,
+        genes_kw={},
         labels_kw={},
     ):
         genes = self.genes
         intervals = [(g.start, g.end) for g in genes]
-        offsets: Sequence[int]
-        if allow_overlaps:
-            offsets = [0] * len(genes)
-        else:
-            offsets = pack_intervals(intervals)
-        colors, labels = self._parse_runtime_parameters(
+        offsets: Sequence[int] = pack_intervals(intervals)
+        colors, labels = self._parse_gene_parameters(
             color_by=color_by, label_by=label_by
         )
-        self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors)
-        if show_labels:
+        self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors, **genes_kw)
+        if not all(label == "" for label in labels):
             self._draw_labels(ax, genes, labels, offsets, colors=colors, **labels_kw)
         ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
         ax.set_ylabel("")

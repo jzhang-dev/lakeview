@@ -159,6 +159,16 @@ def test_IGH():
     gv.savefig(OUTPUT_PNG_PATH, dpi=300)
     assert os.path.getsize(OUTPUT_PNG_PATH) > 100e3
 
+    gv = lv.GenomeViewer(1, figsize=(8, 2))
+    gencode_painter.draw_genes(
+        gv.axes[0], label_by=lambda gene: gene.attributes['gene_name']
+    )
+    gv.set_xlim((105679000, 105776000))
+    gv.set_title("IGH genes")
+    gv.savefig("tests/output/IGH_genes.png", dpi=300)
+    assert os.path.getsize("tests/output/IGH_genes.png") > 10e3
+
+
 
 def test_GAPDH_RNAseq():
     CHROMOSOME, START, END = "chr12", int(6.643e6), int(6.648e6)
@@ -245,3 +255,5 @@ def test_bigwig():
     gv = lv.GenomeViewer(figsize=(8, 2))
     painter.draw(gv.axes[0])
     gv.savefig("tests/output/bigwig.png")
+
+
