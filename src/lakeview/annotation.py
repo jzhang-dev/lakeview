@@ -428,7 +428,7 @@ class GeneAnnotation:
         self._draw_gene_blocks(ax, genes, offsets, height=5, colors=colors, **genes_kw)
         if not all(label == "" for label in labels):
             self._draw_labels(ax, genes, labels, offsets, colors=colors, **labels_kw)
-        ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
+        ax.set_ylim(max(offsets) + 0.7, min(offsets) - 0.3)
         ax.set_ylabel("")
 
     def _draw_gene_blocks(self, ax, genes, offsets, height, *, colors, **kw):
@@ -443,12 +443,32 @@ class GeneAnnotation:
             )
         )
 
-    def _draw_labels(self, ax, annotations, labels, offsets, *, colors, size=8, **kw):
+    def _draw_labels(
+        self,
+        ax,
+        annotations,
+        labels,
+        offsets,
+        *,
+        colors,
+        size=8,
+        horizontalalignment="center",
+        verticalalignment="bottom",
+        clip_on=True,
+        **kw,
+    ):
         for g, l, y, c in zip(annotations, labels, offsets, colors):
             if l:
                 x = (g.start + g.end) / 2
                 ax.text(
-                    x, y + 0.5, l, ha="center", va="bottom", size=size, clip_on=True
+                    x,
+                    y + 0.5,
+                    l,
+                    horizontalalignment=horizontalalignment,
+                    verticalalignment=verticalalignment,
+                    size=size,
+                    clip_on=clip_on,
+                    **kw,
                 )
 
     @staticmethod
@@ -647,7 +667,7 @@ class GeneAnnotation:
             min(t.start for t in transcripts),
             max(t.end for t in transcripts),
         )
-        ax.set_ylim(max(offsets) + 0.5, min(offsets) - 0.5)
+        ax.set_ylim(max(offsets) + 0.7, min(offsets) - 0.3)
         ax.set_yticks([])
 
         self._draw_transcript_backbones(

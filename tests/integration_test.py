@@ -161,7 +161,7 @@ def test_IGH():
 
     gv = lv.GenomeViewer(1, figsize=(8, 2))
     gencode_painter.draw_genes(
-        gv.axes[0], label_by=lambda gene: gene.attributes['gene_name']
+        gv.axes[0], label_by=lambda gene: gene.attributes['gene_name'], labels_kw=dict(size=10, rotation=15, verticalalignment='top')
     )
     gv.set_xlim((105679000, 105776000))
     gv.set_title("IGH genes")
