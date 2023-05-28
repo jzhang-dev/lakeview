@@ -49,9 +49,9 @@ def get_random_colors(n: int, *, seed=0, cmap="hsv") -> list[Color]:
     >>> get_random_colors(3)
     [(0.0, 0.22463448382566054, 1.0, 1.0), (0.4018366371307548, 1.0, 0.0, 1.0), (1.0, 0.2316178786767022, 0.0, 1.0)]
     """
-    rng = np.random.default_rng(seed=0)
-    cmap = plt.get_cmap("hsv")
-    colors = [cmap(rng.random()) for __ in range(n)]
+    rng = np.random.default_rng(seed=seed)
+    _cmap = plt.get_cmap(cmap)
+    colors = [_cmap(rng.random()) for __ in range(n)]
     return colors
 
 
