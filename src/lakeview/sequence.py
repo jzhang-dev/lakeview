@@ -171,10 +171,10 @@ class DotPlot:
 
     # TODO: max_dots
     def draw_dots(
-        self, ax, *, x_offset=0, y_offset=0, s=0.5, max_dots=1e6, edgecolor="none"
+        self, ax, *, x_offset=0, y_offset=0, s=0.5, max_dots=1e6, color=None, edgecolor="none"
     ):
         xs = np.array([dot.x for dot in self.dots]) + x_offset
         ys = np.array([dot.y for dot in self.dots]) + y_offset
-        ax.scatter(xs, ys, s=s, edgecolor=edgecolor)
+        ax.scatter(xs, ys, s=s, color=color, edgecolor=edgecolor)
         ax.set_xlim(x_offset, x_offset + self.x_sequence_size - 1)
         ax.set_ylim(y_offset, y_offset + self.y_sequence_size - 1)
