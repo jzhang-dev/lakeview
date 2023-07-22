@@ -571,6 +571,7 @@ class GeneAnnotation:
         if filter_by is not None:
             transcripts = key_filter(transcripts, filter_keys)
             groups = key_filter(groups, filter_keys)
+            colors = key_filter(colors, filter_keys)
             labels = key_filter(labels, filter_keys)
             if sort_by is not None:
                 sort_keys = key_filter(sort_keys, filter_keys)
