@@ -31,6 +31,7 @@ class AnnotationRecord:
     score: Optional[float] = None
     strand: Optional[str] = None
     frame: Optional[str] = None
+    gene_name: Optional[str] = None
     attributes: dict[str, str] = field(default_factory=dict)
 
     def __len__(self):
@@ -43,7 +44,6 @@ class GeneRecord(AnnotationRecord):  # TODO
 
 class TranscriptRecord(AnnotationRecord):
     transcript_id: str
-    gene_name: Optional[str]
 
     def __init__(
         self, *args, transcript_id: str, gene_name: Optional[str] = None, **kw
