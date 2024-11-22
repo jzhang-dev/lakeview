@@ -41,7 +41,7 @@ def is_canonical(kmer):
     >>> is_canonical("GGC")
     False
     """
-    # This function uses the alphabetical/lexicographical ("ACGT") order to determine canonical kmers. 
+    # This function uses the alphabetical/lexicographical ("ACGT") order to determine canonical kmers.
     # JellyFish also uses the "ACGT" order, while Meryl uses the "ACTG" order by default. See https://github.com/marbl/meryl/blob/69c839cf43b774916b9a004f8143a00d4f9aac86/src/meryl2/merylOp-nextMer.C#L30
     return kmer <= reverse_complement(kmer)
 
@@ -85,7 +85,9 @@ def load_multiple_sequences(
     for record in SeqIO.parse(file_object, format=format_):
         if record.id in sequence_names:
             sequence_dict[record.id] = str(record.seq)
-            missing_names = [name for name in missing_names if name not in sequence_dict]
+            missing_names = [
+                name for name in missing_names if name not in sequence_dict
+            ]
             if not missing_names:
                 break
     if missing_names:
@@ -114,15 +116,11 @@ class DotPlot:
     @classmethod
     def from_sequences(
         cls,
-        x_sequence,
-        y_sequence,
-        k=50,
+        x_sequence: str,
+        y_sequence: str,
+        k: int = 50,
         *,
-        sample_fraction=1,
-        x_start=0,  # TODO
-        x_end=float("inf"),
-        y_start=0,
-        y_end=float("inf"),
+        sample_fraction: float = 1.0,
     ):
         if not (0 < sample_fraction <= 1):
             raise ValueError(
@@ -171,7 +169,15 @@ class DotPlot:
 
     # TODO: max_dots
     def draw_dots(
-        self, ax, *, x_offset=0, y_offset=0, s=0.5, max_dots=1e6, color=None, edgecolor="none"
+        self,
+        ax,
+        *,
+        x_offset=0,
+        y_offset=0,
+        s=0.5,
+        max_dots=1e6,
+        color=None,
+        edgecolor="none",
     ):
         xs = np.array([dot.x for dot in self.dots]) + x_offset
         ys = np.array([dot.y for dot in self.dots]) + y_offset
